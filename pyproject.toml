@@ -1,0 +1,21 @@
+[project]
+name = "nhl-match-prediction"
+version = "0.1.0"
+description = "Machine learning system for predicting NHL match outcomes"
+authors = [
+    {name = "sergeiperel"}
+]
+license = "MIT"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy (>=2.4.0,<3.0.0)",
+    "pandas (>=2.3.3,<3.0.0)",
+    "scikit-learn (>=1.8.0,<2.0.0)",
+    "requests (>=2.32.5,<3.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
