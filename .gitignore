@@ -77,6 +77,8 @@ target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+notebooks/*
+!notebooks/.gitkeep
 
 # IPython
 profile_default/
@@ -208,3 +210,14 @@ __marimo__/
 
 
 .idea/
+
+
+# data
+data/raw/*
+data/processed/*
+data/sql/*
+
+# keep folder structure
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/sql/.gitkeep
