@@ -2,9 +2,12 @@ import csv
 import json
 from pathlib import Path
 
-RAW_DIR = Path("data")
-OUT_DIR = Path("processed")
-OUT_DIR.mkdir(exist_ok=True)
+BASE_DIR = Path(__file__).resolve().parents[2]
+
+RAW_DIR = BASE_DIR / "data" / "raw"
+OUT_DIR = BASE_DIR / "data" / "processed"
+
+OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # -----------------------
 # helpers
