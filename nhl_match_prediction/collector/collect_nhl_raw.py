@@ -6,7 +6,8 @@ from pathlib import Path
 import requests
 
 BASE_URL = "https://api-web.nhle.com/v1"
-DATA_DIR = Path("data")
+BASE_DIR = Path(__file__).resolve().parents[2]
+DATA_DIR = BASE_DIR / "data" / "raw"
 
 ENDPOINTS = {
     "schedule": lambda d: f"/schedule/{d}",

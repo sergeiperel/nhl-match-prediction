@@ -3,8 +3,10 @@ from pathlib import Path
 
 import pandas as pd
 
-DB_PATH = Path("data_sql/nhl.db")
-DATA_PATH = Path("processed")
+BASE_DIR = Path(__file__).resolve().parents[2]
+
+DB_PATH = BASE_DIR / "data" / "sql" / "nhl.db"
+DATA_PATH = BASE_DIR / "data" / "processed"
 
 conn = sqlite3.connect(DB_PATH)
 
