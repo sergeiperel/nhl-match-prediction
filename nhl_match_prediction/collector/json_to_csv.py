@@ -67,9 +67,16 @@ team_rows = []
 
 for path in (RAW_DIR / "boxscore").glob("*.json"):
     data = read_json(path)
-    game_id = data["id"]
+    game_id = data.get("id")
+
+    if "playerByGameStats" not in data:
+        print(f"boxscore {game_id}: no playerByGameStats, skipping")
+        continue
 
     for side in ["homeTeam", "awayTeam"]:
+        if side not in data["playerByGameStats"]:
+            continue
+
         team_meta = data[side]
         team_stats = data["playerByGameStats"][side]
 
@@ -105,6 +112,10 @@ goalie_rows = []
 for path in (RAW_DIR / "boxscore").glob("*.json"):
     data = read_json(path)
     game_id = data["id"]
+
+    if "playerByGameStats" not in data:
+        print(f"boxscore {game_id}: no playerByGameStats, skipping")
+        continue
 
     for side in ["homeTeam", "awayTeam"]:
         team = data[side]
