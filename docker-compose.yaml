@@ -1,0 +1,39 @@
+version: "3.12"
+
+services:
+  db:
+    image: redis
+    volumes:
+      - redis-volume:/data
+    networks:
+      - net-back
+
+  frontend:
+    image: nginx
+    volumes:
+      - ./content:/usr/share/nginx/html
+      - ./configs:/etc/nginx/conf.d
+    ports:
+      - "8081:80"
+    networks:
+      - net-back
+
+  backend:
+    build: .
+    ports:
+      - "8089"
+
+    networks:
+      - net-front
+      - net-back
+
+
+
+volumes:
+  redis-volume:
+
+
+networks:
+  net-front:
+
+  net-back:
