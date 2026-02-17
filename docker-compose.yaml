@@ -8,6 +8,15 @@ services:
     networks:
       - net-back
 
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 2s
+      retries: 5
+      start_period: 30s
+      start_interval: 3s
+
+
   frontend:
     image: nginx
     volumes:
@@ -17,6 +26,11 @@ services:
       - "8081:80"
     networks:
       - net-back
+    depends_on:
+      backend:
+        condition: service_healthy
+
+
 
   backend:
     build: .
@@ -26,6 +40,18 @@ services:
     networks:
       - net-front
       - net-back
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8089/health"]
+      interval: 10s
+      timeout: 2s
+      retries: 5
+      start_period: 30s
+      start_interval: 3s
+
+    depends_on:
+      db:
+        condition: service_healthy
 
 
 
