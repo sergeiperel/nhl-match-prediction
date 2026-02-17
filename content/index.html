@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NHL Match Insight — Предсказания и аналитика матчей НХЛ</title>
+  <meta name="description" content="Аналитика матчей НХЛ, предсказания результатов на основе статистики и информации о предстоящих играх." />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ice: '#0f172a',
+            rink: '#020617',
+            accent: '#38bdf8',
+            accentSoft: '#0ea5e9'
+          },
+          fontFamily: {
+            sans: ['system-ui', 'ui-sans-serif', 'Segoe UI', 'Roboto', 'sans-serif']
+          },
+          backgroundImage: {
+            'ice-texture': 'radial-gradient(circle at top, rgba(56,189,248,0.2), transparent 60%), radial-gradient(circle at bottom, rgba(59,130,246,0.15), transparent 55%)'
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-rink text-slate-100 font-sans antialiased">
+  <!-- Page wrapper -->
+  <div class="min-h-screen flex flex-col bg-ice-texture">
+    <!-- Navbar -->
+    <header class="sticky top-0 z-30 border-b border-slate-800/70 bg-rink/80 backdrop-blur">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex h-16 items-center justify-between">
+          <a href="#" class="flex items-center gap-3">
+            <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-accent to-sky-500 shadow-lg shadow-sky-500/40">
+              <span class="text-xl font-semibold tracking-tight">N</span>
+            </div>
+            <div class="flex flex-col leading-tight">
+              <span class="font-semibold text-sm sm:text-base tracking-tight">NHL Match Insight</span>
+              <span class="text-[11px] sm:text-xs text-slate-400">Предсказания и аналитика НХЛ</span>
+            </div>
+          </a>
+
+          <nav class="hidden md:flex items-center gap-8 text-sm">
+            <a href="#predictions" class="text-slate-300 hover:text-white transition-colors">Предсказания</a>
+            <a href="#analytics" class="text-slate-300 hover:text-white transition-colors">Аналитика</a>
+            <a href="#upcoming" class="text-slate-300 hover:text-white transition-colors">Ближайшие матчи</a>
+            <a href="#how-it-works" class="text-slate-300 hover:text-white transition-colors">Как это работает</a>
+          </nav>
+
+          <div class="flex items-center gap-3">
+            <button class="hidden sm:inline-flex px-3 py-1.5 text-xs sm:text-sm font-medium text-slate-200 border border-slate-600/70 rounded-lg hover:border-accent/80 hover:text-white transition-colors">
+              Войти
+            </button>
+            <a href="#cta" class="inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold rounded-lg bg-accentSoft hover:bg-sky-500 text-slate-950 shadow-lg shadow-sky-500/40 transition-colors">
+              Начать бесплатно
+            </a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main content -->
+    <main class="flex-1">
+      <!-- Hero Section -->
+      <section class="relative overflow-hidden">
+        <!-- Glow gradients -->
+        <div class="pointer-events-none absolute inset-0">
+          <div class="absolute -top-32 -left-24 h-72 w-72 rounded-full bg-sky-500/20 blur-3xl"></div>
+          <div class="absolute -bottom-40 -right-32 h-96 w-96 rounded-full bg-blue-700/30 blur-3xl"></div>
+        </div>
+
+        <div class="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20 lg:py-24">
+          <div class="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
+            <!-- Text block -->
+            <div>
+              <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-sky-500/40 bg-sky-500/10 text-[11px] sm:text-xs text-sky-200 mb-5">
+                <span class="inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>Live-аналитика матчей НХЛ в одном месте</span>
+              </div>
+
+              <h1 class="text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-tight text-white mb-4">
+                Умные предсказания результатов матчей
+                <span class="block text-sky-400 mt-1">на основе реальной статистики НХЛ</span>
+              </h1>
+
+              <p class="text-sm sm:text-base text-slate-300 max-w-xl mb-6">
+                Используйте модель машинного обучения и продвинутую аналитику, чтобы оценивать шансы команд,
+                отслеживать форму игроков и заранее видеть картину предстоящих матчей НХЛ.
+              </p>
+
+              <div class="flex flex-col sm:flex-row gap-3 sm:items-center mb-6">
+                <a href="#cta" class="inline-flex items-center justify-center px-4 sm:px-5 py-2.5 text-sm font-semibold rounded-lg bg-accentSoft hover:bg-sky-500 text-slate-950 shadow-lg shadow-sky-500/40 transition-colors">
+                  Попробовать демо
+                </a>
+                <button class="inline-flex items-center justify-center px-4 py-2 text-xs sm:text-sm font-medium text-slate-200 border border-slate-600/70 rounded-lg hover:border-accent/80 hover:text-white transition-colors">
+                  Смотреть примеры аналитики
+                </button>
+              </div>
+
+              <div class="grid grid-cols-3 gap-4 text-xs sm:text-sm text-slate-300">
+                <div>
+                  <div class="font-semibold text-white text-base sm:text-lg">72%</div>
+                  <div class="text-slate-400 text-[11px] sm:text-xs">Средняя точность предсказаний исхода матчей</div>
+                </div>
+                <div>
+                  <div class="font-semibold text-white text-base sm:text-lg">30+</div>
+                  <div class="text-slate-400 text-[11px] sm:text-xs">Ключевых метрик: xG, спецбригады, форма вратарей</div>
+                </div>
+                <div>
+                  <div class="font-semibold text-white text-base sm:text-lg">24/7</div>
+                  <div class="text-slate-400 text-[11px] sm:text-xs">Обновления для регулярки и плей-офф</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right side: mockup / cards -->
+            <div class="lg:pl-6">
+              <div class="relative">
+                <!-- Rink background card -->
+                <div class="relative rounded-2xl border border-slate-700/70 bg-gradient-to-br from-slate-900/80 via-slate-900/60 to-slate-950/90 backdrop-blur p-4 sm:p-5 shadow-2xl shadow-sky-900/50">
+                  <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                      <span class="inline-flex h-2 w-2 rounded-full bg-emerald-400"></span>
+                      <span class="text-xs font-medium text-slate-300">Прогноз на матч</span>
+                    </div>
+                    <span class="text-[11px] text-slate-400">Сегодня, 20:00 (ET)</span>
+                  </div>
+
+                  <div class="grid grid-cols-[1fr_auto_1fr] gap-3 items-center mb-4">
+                    <!-- Home team -->
+                    <div class="flex flex-col items-start">
+                      <div class="flex items-center gap-2">
+                        <div class="h-8 w-8 rounded-lg bg-slate-800 flex items-center justify-center text-xs font-semibold">
+                          TOR
+                        </div>
+                        <span class="text-sm font-semibold">Toronto Maple Leafs</span>
+                      </div>
+                      <span class="mt-1 text-[11px] text-slate-400">Форма: 4–1–0</span>
+                    </div>
+
+                    <!-- Probabilities -->
+                    <div class="flex flex-col items-center">
+                      <span class="text-[11px] text-slate-400 mb-1">Вероятность победы</span>
+                      <div class="flex items-baseline gap-1">
+                        <span class="text-2xl font-semibold text-emerald-400">63%</span>
+                      </div>
+                    </div>
+
+                    <!-- Away team -->
+                    <div class="flex flex-col items-end">
+                      <div class="flex items-center gap-2">
+                        <span class="text-sm font-semibold text-right">Montreal Canadiens</span>
+                        <div class="h-8 w-8 rounded-lg bg-slate-800 flex items-center justify-center text-xs font-semibold">
+                          MTL
+                        </div>
+                      </div>
+                      <span class="mt-1 text-[11px] text-slate-400">Форма: 2–3–0</span>
+                    </div>
+                  </div>
+
+                  <!-- Progress bars -->
+                  <div class="space-y-2 mb-4">
+                    <div class="flex justify-between text-[11px] text-slate-400 mb-1">
+                      <span>Победа TOR</span>
+                      <span>63%</span>
+                    </div>
+                    <div class="h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                      <div class="h-full w-[63%] bg-gradient-to-r from-emerald-400 to-sky-400"></div>
+                    </div>
+
+                    <div class="flex justify-between text-[11px] text-slate-400 mb-1">
+                      <span>Победа MTL</span>
+                      <span>27%</span>
+                    </div>
+                    <div class="h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                      <div class="h-full w-[27%] bg-gradient-to-r from-rose-400 to-orange-400"></div>
+                    </div>
+
+                    <div class="flex justify-between text-[11px] text-slate-400 mb-1">
+                      <span>Овертайм/буллиты</span>
+                      <span>10%</span>
+                    </div>
+                    <div class="h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                      <div class="h-full w-[10%] bg-gradient-to-r from-slate-300 to-slate-500"></div>
+                    </div>
+                  </div>
+
+                  <!-- Key stats -->
+                  <div class="grid grid-cols-2 gap-3 text-[11px] sm:text-xs">
+                    <div class="rounded-xl border border-slate-700/80 bg-slate-900/70 px-3 py-2">
+                      <div class="flex items-center justify-between mb-1.5">
+                        <span class="text-slate-300">xG (последние 5)</span>
+                        <span class="text-emerald-400 font-semibold">+18%</span>
+                      </div>
+                      <p class="text-slate-400 text-[11px]">
+                        Преимущество по ожидаемым голам, сильнее в равных составах.
+                      </p>
+                    </div>
+                    <div class="rounded-xl border border-slate-700/80 bg-slate-900/70 px-3 py-2">
+                      <div class="flex items-center justify-between mb-1.5">
+                        <span class="text-slate-300">Спецбригады</span>
+                        <span class="text-sky-400 font-semibold">ТОП-5 лиги</span>
+                      </div>
+                      <p class="text-slate-400 text-[11px]">
+                        Real-time анализ большинства и меньшинства с поправкой на соперников.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Floating chips -->
+                <div class="absolute -top-4 -right-2 sm:-right-4 lg:-right-6">
+                  <div class="rounded-xl bg-slate-900/90 border border-slate-700/80 px-3 py-2 shadow-xl shadow-sky-900/50">
+                    <div class="text-[11px] text-slate-400 mb-0.5">Модель говорит:</div>
+                    <div class="text-xs font-semibold text-emerald-400">Value на победу TOR в основное время</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Features: Predictions / Analytics / Schedule -->
+      <section id="predictions" class="border-t border-slate-800/70 bg-rink/60">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
+          <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
+            <div>
+              <h2 class="text-xl sm:text-2xl font-semibold text-white mb-2">Что вы получаете</h2>
+              <p class="text-sm text-slate-300 max-w-2xl">
+                Сервис сочетает статистику, форму и расписание, чтобы вы могли принимать более взвешенные решения
+                по матчам НХЛ.
+              </p>
+            </div>
+          </div>
+
+          <div class="grid md:grid-cols-3 gap-5 lg:gap-6">
+            <!-- Card 1: Predictions -->
+            <div class="rounded-2xl border border-slate-800 bg-slate-950/70 p-5 flex flex-col">
+              <div class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-sky-500/15 text-sky-400 mb-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h12a2.25 2.25 0 002.25-2.25V3M3.75 3h16.5M3.75 3L9 9.75m6 0L20.25 3" />
+                </svg>
+              </div>
+              <h3 class="text-sm font-semibold text-white mb-1.5">Предсказания исхода и тоталов</h3>
+              <p class="text-sm text-slate-300 mb-3">
+                Прогнозы победителей, тоталов и вероятности ОТ/буллитов на основе ML-модели, учитывающей десятки метрик.
+              </p>
+              <ul class="mt-auto space-y-1.5 text-[11px] text-slate-400">
+                <li>• Вероятности исхода (1X2, победа в основное/с ОТ)</li>
+                <li>• Рекомендации по value-ставкам</li>
+                <li>• Динамика коэффициентов по рынку</li>
+              </ul>
+            </div>
+
+            <!-- Card 2: Analytics -->
+            <div id="analytics" class="rounded-2xl border border-slate-800 bg-slate-950/70 p-5 flex flex-col">
+              <div class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-400 mb-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25C7.996 12 9 10.996 9 9.375V4.125C9 3.504 9.504 3 10.125 3h3.75C14.496 3 15 3.504 15 4.125v15.75A1.125 1.125 0 0113.875 21h-9.75A1.125 1.125 0 013 19.875v-6.75zM15 8.625c0-.621.504-1.125 1.125-1.125h2.25C19.496 7.5 21 8.504 21 10.125v9.75A1.125 1.125 0 0119.875 21H15V8.625z" />
+                </svg>
+              </div>
+              <h3 class="text-sm font-semibold text-white mb-1.5">Глубокая статистическая аналитика</h3>
+              <p class="text-sm text-slate-300 mb-3">
+                От xG до эффективности большинства и вратарей: все ключевые показатели собраны в наглядные дашборды.
+              </p>
+              <ul class="mt-auto space-y-1.5 text-[11px] text-slate-400">
+                <li>• Продвинутая статистика (xGF/xGA, Corsi, Fenwick)</li>
+                <li>• Форма линий и сочетаний пятёрок</li>
+                <li>• Сравнение команд с поправкой на календарь</li>
+              </ul>
+            </div>
+
+            <!-- Card 3: Upcoming -->
+            <div id="upcoming" class="rounded-2xl border border-slate-800 bg-slate-950/70 p-5 flex flex-col">
+              <div class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-500/15 text-indigo-400 mb-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8.25 6.75V4.5m7.5 2.25V4.5M4.5 9.75h15M6.75 4.5h10.5A2.25 2.25 0 0119.5 6.75v10.5A2.25 2.25 0 0117.25 19.5H6.75A2.25 2.25 0 014.5 17.25V6.75A2.25 2.25 0 016.75 4.5z" />
+                </svg>
+              </div>
+              <h3 class="text-sm font-semibold text-white mb-1.5">Расписание и трекинг матчей</h3>
+              <p class="text-sm text-slate-300 mb-3">
+                Все предстоящие матчи с прогнозами, индивидуальными картами команд и уведомлениями об обновлениях.
+              </p>
+              <ul class="mt-auto space-y-1.5 text-[11px] text-slate-400">
+                <li>• Календарь матчей НХЛ с фильтрами</li>
+                <li>• Уведомления при изменении составов и линий</li>
+                <li>• История матчей и head-to-head статистика</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Upcoming Matches preview -->
+      <section class="border-t border-slate-800/70 bg-gradient-to-b from-rink/60 to-ice/80">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
+          <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
+            <div>
+              <h2 class="text-xl sm:text-2xl font-semibold text-white mb-2">Ближайшие матчи НХЛ</h2>
+              <p class="text-sm text-slate-300 max-w-xl">
+                Демонстрационный виджет. В продакшене здесь будут live-данные из вашей модели.
+              </p>
+            </div>
+            <button class="inline-flex items-center px-4 py-2 text-xs sm:text-sm font-medium text-slate-200 border border-slate-700/80 rounded-lg hover:border-accent/80 hover:text-white transition-colors">
+              Смотреть полный календарь
+            </button>
+          </div>
+
+          <div class="grid gap-4 lg:gap-5">
+            <!-- Match row -->
+            <div class="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 sm:px-5 py-3.5 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div class="flex items-center gap-3 sm:gap-4">
+                <div class="flex flex-col items-center gap-1">
+                  <div class="h-8 w-8 rounded-lg bg-slate-800 flex items-center justify-center text-[11px] font-semibold">NYR</div>
+                  <span class="text-[11px] text-slate-400">NY Rangers</span>
+                </div>
+                <div class="text-xs text-slate-400">vs</div>
+                <div class="flex flex-col items-center gap-1">
+                  <div class="h-8 w-8 rounded-lg bg-slate-800 flex items-center justify-center text-[11px] font-semibold">BOS</div>
+                  <span class="text-[11px] text-slate-400">Boston Bruins</span>
+                </div>
+                <div class="hidden sm:flex flex-col ml-3 text-[11px] text-slate-400">
+                  <span>Завтра, 19:30 (ET)</span>
+                  <span>Madison Square Garden</span>
+                </div>
+              </div>
+              <div class="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto">
+                <div class="flex flex-col text-[11px] text-slate-400">
+                  <span>Вероятность NYR: <span class="text-emerald-400 font-semibold">55%</span></span>
+                  <span>Вероятность BOS: <span class="text-slate-200 font-semibold">45%</span></span>
+                </div>
+                <button class="inline-flex items-center justify-center px-3 py-1.5 text-[11px] font-medium rounded-lg bg-slate-900 border border-slate-700/80 hover:border-accent/80 hover:text-white transition-colors">
+                  Подробнее
+                </button>
+              </div>
+            </div>
+
+            <div class="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 sm:px-5 py-3.5 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div class="flex items-center gap-3 sm:gap-4">
+                <div class="flex flex-col items-center gap-1">
+                  <div class="h-8 w-8 rounded-lg bg-slate-800 flex items-center justify-center text-[11px] font-semibold">VGK</div>
+                  <span class="text-[11px] text-slate-400">Vegas Golden Knights</span>
+                </div>
+                <div class="text-xs text-slate-400">vs</div>
+                <div class="flex flex-col items-center gap-1">
+                  <div class="h-8 w-8 rounded-lg bg-slate-800 flex items-center justify-center text-[11px] font-semibold">EDM</div>
+                  <span class="text-[11px] text-slate-400">Edmonton Oilers</span>
+                </div>
+                <div class="hidden sm:flex flex-col ml-3 text-[11px] text-slate-400">
+                  <span>Через 2 дня, 22:00 (ET)</span>
+                  <span>T-Mobile Arena</span>
+                </div>
+              </div>
+              <div class="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto">
+                <div class="flex flex-col text-[11px] text-slate-400">
+                  <span>Тотал 5.5: <span class="text-sky-400 font-semibold">вероятен over</span></span>
+                  <span>Модель xG: <span class="text-slate-200 font-semibold">6.4 гола</span></span>
+                </div>
+                <button class="inline-flex items-center justify-center px-3 py-1.5 text-[11px] font-medium rounded-lg bg-slate-900 border border-slate-700/80 hover:border-accent/80 hover:text-white transition-colors">
+                  Подробнее
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- How it works -->
+      <section id="how-it-works" class="border-t border-slate-800/70 bg-rink/70">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
+          <div class="grid lg:grid-cols-[1.3fr,1fr] gap-8 lg:gap-10 items-start">
+            <div>
+              <h2 class="text-xl sm:text-2xl font-semibold text-white mb-3">Как работает система предсказаний</h2>
+              <p class="text-sm text-slate-300 mb-5 max-w-2xl">
+                Мы объединяем исторические данные, live-статистику, информацию о составах и расписании,
+                чтобы выдавать актуальные и прозрачные прогнозы по каждому матчу НХЛ.
+              </p>
+              <ol class="space-y-3 text-sm text-slate-200">
+                <li class="flex gap-3">
+                  <span class="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-slate-800 text-[11px] text-slate-300">1</span>
+                  <div>
+                    <div class="font-semibold text-sm">Сбор и нормализация данных</div>
+                    <p class="text-xs mt-1 text-slate-400">
+                      Загружаем статистику матчей, составы, травмы, расписание, показатели xG/xGA, Corsi, спецбригады и другие метрики.
+                    </p>
+                  </div>
+                </li>
+                <li class="flex gap-3">
+                  <span class="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-slate-800 text-[11px] text-slate-300">2</span>
+                  <div>
+                    <div class="font-semibold text-sm">Моделирование исходов</div>
+                    <p class="text-xs mt-1 text-slate-400">
+                      ML-модель обучается на исторических данных и учитывает текущую форму команд, нагрузку календаря, back-to-back игры и многое другое.
+                    </p>
+                  </div>
+                </li>
+                <li class="flex gap-3">
+                  <span class="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-slate-800 text-[11px] text-slate-300">3</span>
+                  <div>
+                    <div class="font-semibold text-sm">Визуализация и рекомендации</div>
+                    <p class="text-xs mt-1 text-slate-400">
+                      Представляем результаты в виде понятных дашбордов: вероятности исходов, тоталы, value-зоны и подробная аналитика по каждому матчу.
+                    </p>
+                  </div>
+                </li>
+              </ol>
+            </div>
+
+            <!-- Side mini-panel -->
+            <div class="rounded-2xl border border-slate-800 bg-slate-950/70 p-5">
+              <h3 class="text-sm font-semibold text-white mb-3">Пример прогноза по матчу</h3>
+              <div class="space-y-3 text-[11px] text-slate-300">
+                <div class="flex justify-between">
+                  <span>Вероятность победы фаворита</span>
+                  <span class="font-semibold text-emerald-400">68%</span>
+                </div>
+                <div class="flex justify-between">
+                  <span>Вероятность тотал &gt; 5.5</span>
+                  <span class="font-semibold text-sky-400">61%</span>
+                </div>
+                <div class="flex justify-between">
+                  <span>Форма вратаря (посл. 5 игр)</span>
+                  <span class="font-semibold text-slate-200">0.925 sv%</span>
+                </div>
+                <div class="flex justify-between">
+                  <span>Эффективность большинства</span>
+                  <span class="font-semibold text-slate-200">27.3%</span>
+                </div>
+              </div>
+              <div class="mt-4 rounded-xl bg-slate-900/80 border border-slate-800 px-3 py-2 text-[11px] text-slate-400">
+                <span class="font-semibold text-sky-300">Комментарий модели:</span>
+                <p class="mt-1">
+                  Матч ожидается результативным за счёт сильных спецбригад и высокой скоростной игры в первом звене
+                  обеих команд.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CTA -->
+      <section id="cta" class="border-t border-slate-800/70 bg-gradient-to-r from-slate-950 via-rink to-slate-950">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
+          <div class="rounded-2xl border border-sky-500/40 bg-gradient-to-br from-sky-500/15 via-slate-950/90 to-slate-950/95 px-5 sm:px-8 py-7 sm:py-9 flex flex-col lg:flex-row lg:items-center gap-6">
+            <div class="flex-1">
+              <h2 class="text-xl sm:text-2xl font-semibold text-white mb-2">
+                Готовы протестировать модель на реальных матчах НХЛ?
+              </h2>
+              <p class="text-sm text-slate-200 max-w-xl">
+                Оставьте почту, чтобы получить доступ к демо-панели с предстоящими матчами, прогнозами и аналитикой.
+              </p>
+            </div>
+            <form class="flex-1 max-w-md w-full">
+              <div class="flex flex-col sm:flex-row gap-3">
+                <div class="flex-1">
+                  <label for="email" class="sr-only">Email</label>
+                  <input
+                    id="email"
+                    type="email"
+                    placeholder="Введите ваш email"
+                    class="w-full rounded-lg border border-slate-700 bg-slate-950/80 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:border-sky-400 focus:outline-none focus:ring-1 focus:ring-sky-400"
+                  />
+                </div>
+                <button
+                  type="button"
+                  class="inline-flex items-center justify-center px-4 sm:px-5 py-2 text-sm font-semibold rounded-lg bg-accentSoft hover:bg-sky-500 text-slate-950 shadow-lg shadow-sky-500/40 transition-colors"
+                >
+                  Получить доступ
+                </button>
+              </div>
+              <p class="mt-2 text-[11px] text-slate-400">
+                Без спама. Можно отписаться в любой момент.
+              </p>
+            </form>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800/70 bg-rink/90">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5 flex flex-col sm:flex-row items-center justify-between gap-2">
+        <p class="text-[11px] sm:text-xs text-slate-500">
+          © <span id="year"></span> NHL Match Insight. Проект аналитики матчей НХЛ.
+        </p>
+        <div class="flex items-center gap-4 text-[11px] sm:text-xs text-slate-500">
+          <span>Демо-версия. Данные приведены для примера.</span>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    // Устанавливаем текущий год в подвале
+    const yearSpan = document.getElementById('year');
+    if (yearSpan) {
+      yearSpan.textContent = new Date().getFullYear().toString();
+    }
+  </script>
+</body>
+</html>
