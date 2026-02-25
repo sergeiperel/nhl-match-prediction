@@ -1,5 +1,6 @@
 import json
 import time
+from collections.abc import Iterator
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -13,11 +14,20 @@ ENDPOINTS = {
     "schedule": lambda d: f"/schedule/{d}",
     "landing": lambda gid: f"/gamecenter/{gid}/landing",
     "boxscore": lambda gid: f"/gamecenter/{gid}/boxscore",
-    "standings": lambda d: f"/standings/{d}",
+    "playbyplay": lambda gid: f"/gamecenter/{gid}/play-by-play",
+    "roster": lambda team, season: f"/roster/{team}/{season}",
 }
 
 HEADERS = {"User-Agent": "nhl-data-collector/1.0"}
+
+RETRY_BACKOFF_SECONDS = 0.3
 SECONDS_IN_MINUTE = 60
+REQUEST_DELAY_SECONDS = 0.15
+WEEK_DELAY_SECONDS = 0.15
+
+
+def file_exists(folder: str, name: str) -> bool:
+    return (DATA_DIR / folder / f"{name}.json").exists()
 
 
 def fetch(endpoint: str, retries: int = 3, timeout: int = 10) -> dict:
@@ -25,24 +35,18 @@ def fetch(endpoint: str, retries: int = 3, timeout: int = 10) -> dict:
 
     for attempt in range(1, retries + 1):
         try:
-            r = requests.get(url, headers=HEADERS, timeout=timeout)
-            r.raise_for_status()
-            return r.json()
-
-        except (
-            requests.exceptions.Timeout,
-            requests.exceptions.ConnectionError,
-        ):
+            response = requests.get(url, headers=HEADERS, timeout=timeout)
+            response.raise_for_status()
+            return response.json()
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
             if attempt == retries:
                 raise
-
-            sleep_time = 0.3 * attempt
-            time.sleep(sleep_time)
-
+            time.sleep(RETRY_BACKOFF_SECONDS * attempt)
     return {}
 
 
 def save_json(folder: str, name: str, data: dict) -> None:
+    """Сохраняем JSON"""
     path = DATA_DIR / folder
     path.mkdir(parents=True, exist_ok=True)
 
@@ -51,14 +55,69 @@ def save_json(folder: str, name: str, data: dict) -> None:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def week_starts(start: date, end: date):
+def week_starts(start: date, end: date) -> Iterator[date]:
+    """Генератор дат понедельников в диапазоне [start, end]"""
     current = start - timedelta(days=start.weekday())
     while current <= end:
         yield current
         current += timedelta(days=7)
 
 
-def collect_season(start_date: date, end_date: date):
+def process_rosters(landing: dict) -> None:
+    home_team = landing.get("homeTeam", {}).get("abbrev")
+    away_team = landing.get("awayTeam", {}).get("abbrev")
+    season = landing.get("season")
+
+    for team in (home_team, away_team):
+        if team and season:
+            roster_key = f"{team}_{season}"
+            if not file_exists("rosters", roster_key):
+                try:
+                    roster = fetch(ENDPOINTS["roster"](team, season))
+                    save_json("rosters", roster_key, roster)
+                except Exception as e:
+                    print(f"roster failed {team}:", e)
+
+
+def process_game(game: dict, seen_games: set[int]) -> bool:
+    game_id = game.get("id")
+    if game_id is None:
+        return False
+
+    if game_id in seen_games:
+        return False
+
+    seen_games.add(game_id)
+    landing = None
+
+    try:
+        landing = fetch(ENDPOINTS["landing"](game_id))
+        save_json("games", str(game_id), landing)
+    except Exception as e:
+        print(f"landing failed {game_id}:", e)
+
+    try:
+        boxscore = fetch(ENDPOINTS["boxscore"](game_id))
+        save_json("boxscore", str(game_id), boxscore)
+    except Exception as e:
+        print(f"boxscore failed {game_id}:", e)
+
+    try:
+        if not file_exists("playbyplay", str(game_id)):
+            pbp = fetch(ENDPOINTS["playbyplay"](game_id))
+            save_json("playbyplay", str(game_id), pbp)
+    except Exception as e:
+        print(f"playbyplay failed {game_id}:", e)
+
+    if landing:
+        process_rosters(landing)
+
+    time.sleep(REQUEST_DELAY_SECONDS)
+    return True
+
+
+def collect_season(start_date: date, end_date: date) -> None:
+    """Собираем данные по всем матчам в указанном диапазоне"""
     seen_games: set[int] = set()
 
     for week_start in week_starts(start_date, end_date):
@@ -80,42 +139,22 @@ def collect_season(start_date: date, end_date: date):
         for day in schedule.get("gameWeek", []):
             for game in day.get("games", []):
                 week_total += 1
-                game_id = game["id"]
-
-                if game_id in seen_games:
-                    continue
-
-                seen_games.add(game_id)
-                week_new += 1
-
-                try:
-                    landing = fetch(ENDPOINTS["landing"](game_id))
-                    save_json("games", str(game_id), landing)
-                except Exception as e:
-                    print(f"landing failed {game_id}:", e)
-
-                try:
-                    boxscore = fetch(ENDPOINTS["boxscore"](game_id))
-                    save_json("boxscore", str(game_id), boxscore)
-                except Exception as e:
-                    print(f"boxscore failed {game_id}:", e)
-
-                time.sleep(0.15)
+                if process_game(game, seen_games):
+                    week_new += 1
 
         week_time = time.perf_counter() - week_ts
 
-        time_str = (
-            f"{week_time:.2f}s"
-            if week_time < SECONDS_IN_MINUTE
-            else f"{week_time / SECONDS_IN_MINUTE:.2f}m"
-        )
+        if week_time < SECONDS_IN_MINUTE:
+            time_str = f"{week_time:.2f}s"
+        else:
+            time_str = f"{week_time / SECONDS_IN_MINUTE:.2f}m"
 
         print(f"Week summary: {week_new}/{week_total} games collected in {time_str}")
 
-        time.sleep(0.2)
+        time.sleep(WEEK_DELAY_SECONDS)
 
 
 if __name__ == "__main__":
-    print(time.ctime(time.time()))
-    collect_season(start_date=date(2010, 1, 1), end_date=date(2014, 12, 31))
-    print(time.ctime(time.time()))
+    print(time.ctime())
+    collect_season(start_date=date(2026, 1, 1), end_date=date(2026, 1, 31))
+    print(time.ctime())
