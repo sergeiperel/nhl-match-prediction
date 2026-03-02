@@ -20,7 +20,7 @@ def get_api():
     return {"API": "OK!"}
 
 
-@app.get("/api/redis/put{x}")
+@app.get("/api/redis/put/{x}")
 def put_redis(x: str):
     client.set(x, "1")
     return {"message": "OK!"}
