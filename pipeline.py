@@ -7,8 +7,12 @@ from omegaconf import DictConfig
 
 from nhl_match_prediction.collector.collect_nhl_raw import collect_season
 from nhl_match_prediction.collector.collect_standings import collect_standings
-from nhl_match_prediction.export_import_tables.json_to_csv import main as json_to_csv_main
-from nhl_match_prediction.export_import_tables.load_to_sqllite import main as load_sqlite_main
+from nhl_match_prediction.etl_pipeline.build_match_features import build_match_features
+from nhl_match_prediction.etl_pipeline.export_match_features import (
+    main as export_match_features_main,
+)
+from nhl_match_prediction.etl_pipeline.json_to_csv import main as json_to_csv_main
+from nhl_match_prediction.etl_pipeline.load_to_db import main as load_sqlite_main
 from nhl_match_prediction.features.build_features import build_play_by_play_dataset
 from pipeline_runner import PipelineRunner
 
@@ -95,6 +99,19 @@ def main(cfg: DictConfig):
         func=load_sqlite_main,
         enabled=cfg.steps.load_sqlite,
     )
+
+    runner.run_step(
+        name="Build Match Features",
+        func=build_match_features,
+        enabled=cfg.steps.build_match_features,
+    )
+
+    runner.run_step(
+        name="Match Features → CSV",
+        func=export_match_features_main,
+        enabled=cfg.steps.export_match_features,
+    )
+
     logger.info("✅ Pipeline procedure finished")
 
     runner.finish_pipeline()

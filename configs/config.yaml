@@ -15,6 +15,9 @@ steps:
   build_features: true
   json_to_csv: true
   load_sqlite: true
+  build_match_features: true
+  export_match_features: true
+
 
 hydra:
   run:

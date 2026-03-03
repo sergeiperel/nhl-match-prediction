@@ -10,15 +10,21 @@ OUT_PATH = BASE_DIR / "data" / "processed" / "match_features2.csv"
 
 OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-conn = sqlite3.connect(DB_PATH)
 
-query = """
-SELECT * FROM match_features
-"""
+def main():
+    conn = sqlite3.connect(DB_PATH)
 
-df = pd.read_sql(query, conn)
-df.to_csv(OUT_PATH, index=False)
+    query = """
+    SELECT * FROM match_features
+    """
 
-conn.close()
+    df = pd.read_sql(query, conn)
+    df.to_csv(OUT_PATH, index=False)
 
-print(f"Exported {len(df)} rows to {OUT_PATH}")
+    conn.close()
+
+    print(f"Exported {len(df)} rows to {OUT_PATH}")
+
+
+if __name__ == "__main__":
+    main()
