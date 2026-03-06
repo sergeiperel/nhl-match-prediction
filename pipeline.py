@@ -13,6 +13,7 @@ from nhl_match_prediction.etl_pipeline.export_match_features import (
 )
 from nhl_match_prediction.etl_pipeline.json_to_csv import main as json_to_csv_main
 from nhl_match_prediction.etl_pipeline.load_to_db import main as load_sqlite_main
+from nhl_match_prediction.etl_pipeline.upcoming_match_features import upcoming_match_features
 from nhl_match_prediction.features.build_features import build_play_by_play_dataset
 from pipeline_runner import PipelineRunner
 
@@ -50,7 +51,7 @@ def str_to_date(s: str) -> date:
     return datetime.strptime(s, "%Y-%m-%d").date()
 
 
-@hydra.main(config_path="configs", config_name="config", version_base=None)
+@hydra.main(config_path="configs/collect_data", config_name="config", version_base=None)
 def main(cfg: DictConfig):
     setup_logging(cfg.pipeline.log_level)
     logger = logging.getLogger(__name__)
@@ -103,6 +104,12 @@ def main(cfg: DictConfig):
     runner.run_step(
         name="Build Match Features",
         func=build_match_features,
+        enabled=cfg.steps.build_match_features,
+    )
+
+    runner.run_step(
+        name="Build Upcoming Match Features",
+        func=upcoming_match_features,
         enabled=cfg.steps.build_match_features,
     )
 
