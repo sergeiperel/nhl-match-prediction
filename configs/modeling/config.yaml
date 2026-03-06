@@ -1,0 +1,11 @@
+defaults:
+  - _self_
+  - model: logistic
+  - data: default
+
+experiment_name: baseline_logistic
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null

@@ -6,7 +6,7 @@ import pandas as pd
 BASE_DIR = Path(__file__).resolve().parents[2]
 
 DB_PATH = BASE_DIR / "data" / "sql" / "nhl.db"
-OUT_PATH = BASE_DIR / "data" / "processed" / "match_features2.csv"
+OUT_PATH = BASE_DIR / "data" / "processed" / "match_features.csv"
 
 OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
 

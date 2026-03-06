@@ -19,6 +19,7 @@ def main():
         "standings_daily": "standings_daily.csv",
         "roster_snapshot": "roster_snapshot.csv",
         "play_by_play_stats": "play_by_play_stats.csv",
+        "schedule_games": "schedule_games.csv",
     }
 
     for table_name, file_name in tables.items():

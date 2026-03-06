@@ -352,6 +352,36 @@ def extract_rosters():
     return roster_rows
 
 
+def extract_schedule():
+    rows = []
+
+    for path in (RAW_DIR / "schedule").glob("*.json"):
+        data = read_json(path)
+
+        for day in data.get("gameWeek", []):
+            for game in day.get("games", []):
+                rows.append(
+                    {
+                        "game_id": game["id"],
+                        "season": game["season"],
+                        "game_date": game["startTimeUTC"],
+                        "game_state": game.get("gameState"),
+                        "game_schedule_state": game.get("gameScheduleState"),
+                        "home_team_id": game["homeTeam"]["id"],
+                        "home_team_abbr": game["homeTeam"]["abbrev"],
+                        "away_team_id": game["awayTeam"]["id"],
+                        "away_team_abbr": game["awayTeam"]["abbrev"],
+                        "home_score": game["homeTeam"].get("score"),
+                        "away_score": game["awayTeam"].get("score"),
+                        "venue": game.get("venue", {}).get("default"),
+                        "neutral_site": game.get("neutralSite"),
+                        "period_type": game.get("periodDescriptor", {}).get("periodType"),
+                    }
+                )
+
+    return rows
+
+
 def write_csv(rows, csv_name):
     # -----------------------
     # запись в CSV
@@ -383,6 +413,9 @@ def main():
 
     roster_rows = extract_rosters()
     write_csv(roster_rows, "roster_snapshot.csv")
+
+    schedule_rows = extract_schedule()
+    write_csv(schedule_rows, "schedule_games.csv")
 
 
 if __name__ == "__main__":
