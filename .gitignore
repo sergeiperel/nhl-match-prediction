@@ -221,3 +221,11 @@ data/sql/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 !data/sql/.gitkeep
+
+# logs
+logs/
+!logs/.gitkeep
+
+# predictions
+predictions/
+!predictions/.gitkeep
