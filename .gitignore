@@ -229,3 +229,6 @@ logs/
 # predictions
 predictions/
 !predictions/.gitkeep
+
+# artifacts
+nhl_match_prediction/modeling/artifacts/
