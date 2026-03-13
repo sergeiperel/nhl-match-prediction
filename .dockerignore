@@ -6,3 +6,10 @@ __pycache__/
 *.h5
 .env
 .git/
+.gitignore
+
+logs/
+notebooks/
+data/*
+!data/sql/
+!data/sql/**

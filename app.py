@@ -69,7 +69,9 @@ def predict_upcoming():
         return {"message": "No upcoming games"}
 
     df = df.rename(columns={"home_logo": "home_team_logo", "away_logo": "away_team_logo"})
-    df["game_date"] = pd.to_datetime(df["game_date"]).dt.strftime("%Y-%m-%d")
+
+    df["game_date"] = pd.to_datetime(df["game_date"], utc=True)
+    df["game_date"] = df["game_date"].dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     df = df.reset_index(drop=True)
 
@@ -86,6 +88,8 @@ def predict_upcoming():
             "away_team_abbr",
             "home_team_logo",
             "away_team_logo",
+            # "home_score",
+            # "away_score",
             "prediction",
             "prediction_prob",
         ]
@@ -101,8 +105,6 @@ def predict_today():
     df = df.rename(columns={"home_logo": "home_team_logo", "away_logo": "away_team_logo"})
     df["game_date"] = pd.to_datetime(df["game_date"])
 
-    df = df.reset_index(drop=True)
-
     today = pd.Timestamp(date.today())
     df_today = df[df["game_date"].dt.date == today.date()]
 
@@ -114,9 +116,10 @@ def predict_today():
     df_today["prediction_prob"] = probs[:, 1]
     df_today["prediction"] = (df_today["prediction_prob"] > THRESHOLD).astype(int)
 
-    df_today["game_date"] = df_today["game_date"].dt.strftime("%Y-%m-%d")
+    df["game_date"] = pd.to_datetime(df["game_date"], utc=True)
+    df["game_date"] = df["game_date"].dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    return df[
+    return df_today[
         [
             "game_id",
             "game_date",
@@ -124,6 +127,8 @@ def predict_today():
             "away_team_abbr",
             "home_team_logo",
             "away_team_logo",
+            # "home_score",
+            # "away_score",
             "prediction",
             "prediction_prob",
         ]

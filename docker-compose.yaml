@@ -1,5 +1,3 @@
-version: "3.12"
-
 services:
   db:
     image: redis
@@ -36,6 +34,9 @@ services:
     build: .
     ports:
       - "8089:8089"
+
+    volumes:
+    - .:/app
 
     networks:
       - net-front
