@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+
+<meta charset="UTF-8">
+<title>Ближайшие матчи НХЛ</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+
+</head>
+
+<body class="bg-slate-950 text-white">
+
+<div class="max-w-4xl mx-auto p-6">
+
+<h1 class="text-3xl font-bold mb-8 text-center">
+🏒 Ближайшие матчи НХЛ
+</h1>
+
+<div id="dateButtons" class="flex flex-wrap justify-center gap-3 mb-8"></div>
+
+<div class="flex justify-center mb-8">
+<input
+type="date"
+id="dateFilter"
+class="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white"
+/>
+</div>
+
+<div id="matches" class="space-y-6"></div>
+
+</div>
+
+<script src="/js/matches.js"></script>
+
+</body>
+</html>
