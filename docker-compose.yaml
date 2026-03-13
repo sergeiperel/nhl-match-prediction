@@ -35,7 +35,7 @@ services:
   backend:
     build: .
     ports:
-      - "8089"
+      - "8089:8089"
 
     networks:
       - net-front

@@ -76,7 +76,7 @@ def upcoming_match_features() -> None:
         CREATE TABLE upcoming_match_features AS
         SELECT
             sg.game_id,
-            SUBSTRING(sg.game_date, 1, 10) as game_date,
+            sg.game_date as game_date,
             sg.season,
 
             NULL AS home_win,
