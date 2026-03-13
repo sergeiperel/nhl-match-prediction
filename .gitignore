@@ -223,7 +223,8 @@ data/sql/*
 !data/sql/.gitkeep
 
 # logs
-logs/
+logs/*
+!logs/**/*.dvc
 !logs/.gitkeep
 
 # predictions

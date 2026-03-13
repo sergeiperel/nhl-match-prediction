@@ -1,0 +1,6 @@
+outs:
+- md5: 6750c035d131ead8c1796b47b8e24f79.dir
+  size: 7049
+  nfiles: 2
+  hash: md5
+  path: logistic
