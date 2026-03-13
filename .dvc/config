@@ -1,0 +1,5 @@
+[core]
+    remote = yc_storage
+['remote "yc_storage"']
+    url = s3://nhl-project-data
+    endpointurl = https://storage.yandexcloud.net
