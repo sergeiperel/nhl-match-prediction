@@ -1,4 +1,5 @@
 [core]
-    remote = public_http
-['remote "public_http"']
-    url = https://storage.yandexcloud.net/nhl-project-data
+    remote = yc_storage
+['remote "yc_storage"']
+    url = s3://nhl-project-data
+    endpointurl = https://storage.yandexcloud.net
