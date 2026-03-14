@@ -212,10 +212,10 @@ __marimo__/
 .idea/
 
 
-# data
-data/raw/*
-data/processed/*
-data/sql/*
+# data (raw files ignored, DVC tracks them)
+data/**
+!data/**/*.dvc
+!data/**/.gitkeep
 
 # keep folder structure
 !data/raw/.gitkeep
@@ -233,4 +233,3 @@ predictions/
 
 # artifacts
 nhl_match_prediction/modeling/artifacts/
-/data
