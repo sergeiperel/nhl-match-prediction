@@ -214,18 +214,15 @@ __marimo__/
 
 # data (raw files ignored, DVC tracks them)
 data/**
+!data/**/
 !data/**/*.dvc
 !data/**/.gitkeep
 
-# keep folder structure
-!data/raw/.gitkeep
-!data/processed/.gitkeep
-!data/sql/.gitkeep
-
 # logs
-logs/*
-!logs/**/*.dvc
-!logs/.gitkeep
+logs/**
+!logs/**/
+!logs/*.dvc
+!logs/**/.gitkeep
 
 # predictions
 predictions/
