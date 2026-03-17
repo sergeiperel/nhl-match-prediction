@@ -1,15 +1,40 @@
+# Python virtual environments
 .venv/
+env/
+venv/
+
+# Cache
 __pycache__/
 *.pyc
-*.pkl
-*.csv
-*.h5
+*.pyo
+
+# Data
+data/**
+!data/sql/**
+!data/**/*.dvc
+
+# Predictions / artifacts
+predictions/**
+!predictions/**/*.dvc
+nhl_match_prediction/modeling/artifacts/**
+!nhl_match_prediction/modeling/artifacts/**/*.dvc
+
+# Logs / notebooks
+logs/
+notebooks/
+!notebooks/.gitkeep
+
+# IDE / configs
+.idea/
+.vscode/
 .env
 .git/
 .gitignore
 
-logs/
-notebooks/
-data/*
-!data/sql/
-!data/sql/**
+# Large files (recursive)
+**/*.pkl
+**/*.h5
+**/*.csv
+
+# DVC metadata
+.dvc/
