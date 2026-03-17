@@ -85,7 +85,7 @@ docker-compose up
 - Worker / Consumer - слушает очередь, выполняет обучение модели и обновляет статусы в базе данных.
 - Celery - библиотека для управления очередью задач.
 - Redis - брокер сообщений и очередь задач.
-- Tasks table - таблица в SQLite, где хранится статус каждой задачи: pending → in_progress → success/failure.
+- Tasks table - таблица в SQLite, где хранится статус каждой задачи: `pending → in_progress → success/failure`.
 
 Новые эндпойнты:
 
@@ -122,10 +122,21 @@ docker-compose up
 }
 
 
-Запуск проекта с worker
+Запуск проекта с worker и Flower
 ```
 docker-compose up --build
 ```
+
+- Backend: `http://localhost:8089`
+- Flower (Celery monitoring): `http://localhost:5555`
+
+
+Flower позволяет в реальном времени отслеживать:
+- Состояние очередей
+- Выполнение задач
+- Историю выполненных и текущих задач
+- Метрики Celery
+
 
 
 🧱 Структура проекта
