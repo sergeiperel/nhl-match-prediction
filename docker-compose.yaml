@@ -1,5 +1,5 @@
 services:
-  db:
+  redis:
     image: redis
     volumes:
       - redis-volume:/data
@@ -51,8 +51,22 @@ services:
       start_interval: 3s
 
     depends_on:
-      db:
+      redis:
         condition: service_healthy
+
+  worker:
+    build: .
+    working_dir: /app
+    command: celery -A nhl_match_prediction.tasks.celery_app:celery_app worker --loglevel=info
+    volumes:
+      - .:/app
+    networks:
+      - net-back
+    depends_on:
+      - redis
+    environment:
+      - PYTHONPATH=/appC
+
 
 
 

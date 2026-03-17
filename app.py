@@ -10,9 +10,11 @@ from redis import Redis
 
 from nhl_match_prediction.etl_pipeline.get_upcoming_matches import get_upcoming_matches
 from nhl_match_prediction.modeling.models.logistic import prepare_data
+from scripts.tasks import router as tasks_router
 
 app = FastAPI()
-client = Redis(host="db")
+app.include_router(tasks_router)
+client = Redis(host="redis")
 
 MODEL_PATH = Path(__file__).parent / "logs/logistic/model.joblib"
 CONTENT_DIR = Path(__file__).parent / "content"
