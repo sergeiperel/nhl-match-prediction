@@ -1,5 +1,5 @@
 outs:
-- md5: 4203e1355ee9d67e4d81d26ac3dd415d
+- md5: 509ec1b8fafea7369aec9049b7ae99b6
   size: 165113856
   hash: md5
   path: nhl.db
