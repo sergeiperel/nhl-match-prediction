@@ -123,8 +123,7 @@ def plot_feature_importance(
 
 
 def train_logistic(
-    data_path: Path,
-    model_output_path: Path,
+    data_path: Path, model_output_path: Path, params: dict | None = None
 ) -> dict[str, float]:
     df = load_dataset(data_path)
 
@@ -132,7 +131,10 @@ def train_logistic(
 
     x_train, x_test, y_train, y_test = time_split(x, y)
 
-    model = build_model()
+    if params is None:
+        params = {"max_iter": 1000, "solver": "lbfgs"}
+
+    model = build_model(params)
     model.fit(x_train, y_train)
 
     metrics = evaluate_model(model, x_test, y_test)
