@@ -49,4 +49,4 @@ def get_task_status(task_id: str):
     if not row:
         return {"error": "Task not found"}
     keys = ["id", "task_type", "status", "created_at", "started_at", "finished_at", "result"]
-    return dict(zip(keys, row, strict=True))
+    return dict(zip(keys, row[: len(keys)], strict=True))

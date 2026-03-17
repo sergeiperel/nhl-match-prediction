@@ -1,6 +1,8 @@
 services:
   redis:
     image: redis
+    ports:
+      - "6379:6379"
     volumes:
       - redis-volume:/data
     networks:
@@ -57,15 +59,28 @@ services:
   worker:
     build: .
     working_dir: /app
-    command: celery -A nhl_match_prediction.tasks.celery_app:celery_app worker --loglevel=info
+    command: celery -A nhl_match_prediction.tasks.celery_app:celery_app worker --loglevel=info -E
     volumes:
       - .:/app
     networks:
       - net-back
     depends_on:
       - redis
+      - backend
     environment:
-      - PYTHONPATH=/appC
+      - PYTHONPATH=/app
+
+  flower:
+    image: mher/flower
+    command: >
+      sh -c "sleep 5 && celery --broker=redis://redis:6379/0 flower --port=5555"
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+      - worker
+    networks:
+      - net-back
 
 
 
