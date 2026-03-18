@@ -21,7 +21,7 @@ services:
     image: nginx
     volumes:
       - ./content:/usr/share/nginx/html
-      - ./configs:/etc/nginx/conf.d
+      - ./configs:/etc/nginx/conf.d:ro  # read-only
     ports:
       - "8081:80"
     networks:
@@ -34,8 +34,8 @@ services:
 
   backend:
     build: .
-    ports:
-      - "8089:8089"
+    # ports:
+    #   - "8089:8089"
 
     volumes:
     - .:/app
