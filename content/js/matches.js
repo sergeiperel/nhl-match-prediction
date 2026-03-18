@@ -301,13 +301,29 @@ function renderMatches(){
 
 }
 
-async function loadMatches(){
+async function loadMatches() {
 
-    const response = await fetch("/predict_upcoming")
+    try {
+        const response = await fetch("/api/predict_upcoming")
 
-    allMatches = await response.json()
+        if (!response.ok) {
+            throw new Error("API error")
+        }
 
-    renderMatches()
+        const data = await response.json()
+
+        if (!Array.isArray(data)) {
+            console.warn("Unexpected API response:", data)
+            allMatches = []
+        } else {
+            allMatches = data
+        }
+
+        renderMatches()
+
+    } catch (e) {
+        console.error("Failed to load matches:", e)
+    }
 
 }
 
