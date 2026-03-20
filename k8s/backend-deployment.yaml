@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nhl-backend-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nhl-backend
+  template:
+    metadata:
+      labels:
+        app: nhl-backend
+    spec:
+      containers:
+      - name: nhl-backend
+        image: nhl-backend
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8089
