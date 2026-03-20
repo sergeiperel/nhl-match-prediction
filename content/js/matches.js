@@ -304,7 +304,7 @@ function renderMatches(){
 async function loadMatches() {
 
     try {
-        const response = await fetch("/api/predict_upcoming")
+        const response = await fetch("predict_upcoming")
 
         if (!response.ok) {
             throw new Error("API error")

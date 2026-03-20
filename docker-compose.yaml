@@ -14,7 +14,7 @@ services:
       timeout: 2s
       retries: 5
       start_period: 30s
-      start_interval: 3s
+      #start_interval: 3s
 
 
   frontend:
@@ -50,7 +50,7 @@ services:
       timeout: 2s
       retries: 5
       start_period: 30s
-      start_interval: 3s
+      #start_interval: 3s
 
     depends_on:
       redis:

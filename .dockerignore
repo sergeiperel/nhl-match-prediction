@@ -9,7 +9,7 @@ __pycache__/
 *.pyo
 
 # Data
-data/**
+#data/**
 !data/sql/**
 !data/**/*.dvc
 
@@ -20,7 +20,7 @@ nhl_match_prediction/modeling/artifacts/**
 !nhl_match_prediction/modeling/artifacts/**/*.dvc
 
 # Logs / notebooks
-logs/
+#logs/
 notebooks/
 !notebooks/.gitkeep
 
