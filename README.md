@@ -249,6 +249,11 @@ http://<MINIKUBE_IP>:<NODE_PORT>
 
 Пример: `http://192.168.49.2:30007`
 
+3. Или открыть сервис
+```
+minikube service nhl-backend-service
+```
+
 🔎 Проверка работы приложения
 
 1. Swagger API: `/docs`
