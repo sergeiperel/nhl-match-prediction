@@ -3,6 +3,8 @@ import json
 import logging
 from pathlib import Path
 
+import numpy as np
+
 BASE_DIR = Path(__file__).resolve().parents[2]
 
 RAW_DIR = BASE_DIR / "data" / "raw"
@@ -25,6 +27,29 @@ def toi_to_minutes(toi_str):
     return minutes + seconds / 60
 
 
+def build_team_timezone():
+    team_timezone = {}
+
+    for path in (RAW_DIR / "games").glob("*.json"):
+        data = read_json(path)
+
+        home = data["homeTeam"]
+        tz = data.get("venueUTCOffset")
+
+        if tz and not data.get("neutralSite"):
+            team_timezone[home["id"]] = tz
+
+    return team_timezone
+
+
+def parse_offset(offset_str):
+    if not offset_str:
+        return 0
+    sign = -1 if offset_str.startswith("-") else 1
+    hours = int(offset_str[1:3])
+    return sign * hours
+
+
 def extract_games():
     # -----------------------
     # 1. games.csv
@@ -32,15 +57,33 @@ def extract_games():
 
     games_rows = []
 
+    team_timezone = build_team_timezone()
+
     for path in (RAW_DIR / "games").glob("*.json"):
         data = read_json(path)
 
         game_id = data["id"]
         date = data["gameDate"]
+
+        start_time = data["startTimeUTC"]
+
         season = data["season"]
 
         home = data["homeTeam"]
         away = data["awayTeam"]
+
+        home_tz_str = data.get("venueUTCOffset")
+        away_tz_str = team_timezone.get(away["id"], home_tz_str)
+
+        home_tz = parse_offset(home_tz_str)
+        away_tz = parse_offset(away_tz_str)
+
+        timezone_change = abs(home_tz - away_tz)
+
+        timezone_shift = home_tz - away_tz
+
+        eastward_travel = 1 if timezone_shift > 0 else 0
+        westward_travel = 1 if timezone_shift < 0 else 0
 
         home_score = home.get("score")
         away_score = away.get("score")
@@ -88,6 +131,10 @@ def extract_games():
                 "game_type": data.get("gameType"),
                 "venue": venue,
                 "venue_location": venue_location,
+                "start_time": start_time,
+                "timezone_change": timezone_change,
+                "eastward_travel": eastward_travel,
+                "westward_travel": westward_travel,
                 "neutral_site": 1 if data.get("neutralSite") else 0,
                 "home_team_id": home["id"],
                 "home_team_abbr": home["abbrev"],
@@ -203,16 +250,18 @@ def extract_goalies():
 
                 _ev_saves, ev_shots = parse_sa(goalie.get("evenStrengthShotsAgainst"))
                 _pp_saves, pp_shots = parse_sa(goalie.get("powerPlayShotsAgainst"))
+                _sh_saves, sh_shots = parse_sa(goalie.get("shorthandedShotsAgainst"))
 
                 goalie_rows.append(
                     {
                         "game_id": game_id,
                         "team_id": team_id,
                         "goalie_id": goalie["playerId"],
+                        "goalie_name": goalie.get("name", {}).get("default"),
                         "starter": goalie.get("starter"),
                         "shots_against": shots,
                         "saves": saves,
-                        "save_pct": saves / shots if shots else None,
+                        "save_pct": goalie.get("savePctg"),
                         "toi": goalie.get("toi"),
                         "goals_against": goalie.get("goalsAgainst"),
                         "decision": goalie.get("decision"),
@@ -221,6 +270,7 @@ def extract_goalies():
                         "sh_ga": goalie.get("shorthandedGoalsAgainst"),
                         "ev_shots_against": ev_shots,
                         "pp_shots_against": pp_shots,
+                        "sh_shots_against": sh_shots,
                         "toi_minutes": toi_to_minutes(goalie.get("toi")),
                         "played_full_game": 1 if goalie.get("toi") == "60:00" else 0,
                     }
@@ -290,6 +340,11 @@ def extract_standings():
                     "l10_goals_for": team.get("l10GoalsFor"),
                     "l10_goals_against": team.get("l10GoalsAgainst"),
                     "l10_goal_diff": team.get("l10GoalDifferential"),
+                    # ranking positions
+                    "league_rank": team.get("leagueSequence"),
+                    "conference_rank": team.get("conferenceSequence"),
+                    "division_rank": team.get("divisionSequence"),
+                    "wildcard_rank": team.get("wildcardSequence"),
                     # streak
                     "streak_code": team.get("streakCode"),
                     "streak_count": team.get("streakCount"),
@@ -300,6 +355,22 @@ def extract_standings():
                     "regulation_plus_ot_win_pctg": team.get("regulationPlusOtWinPctg"),
                     "shootout_wins": team.get("shootoutWins"),
                     "shootout_losses": team.get("shootoutLosses"),
+                    # Home / Road win pct
+                    "home_win_pctg": team.get("homeWins") / max(team.get("homeGamesPlayed", 1), 1),
+                    "road_win_pctg": team.get("roadWins") / max(team.get("roadGamesPlayed", 1), 1),
+                    # Goal rates
+                    "goals_for_per_game": team.get("goalFor") / max(team.get("gamesPlayed", 1), 1),
+                    "goals_against_per_game": team.get("goalAgainst")
+                    / max(team.get("gamesPlayed", 1), 1),
+                    # L10 win pct
+                    "l10_win_pctg": team.get("l10Wins") / max(team.get("l10GamesPlayed", 1), 1),
+                    # L10 goal rates
+                    "l10_goals_for_per_game": team.get("l10GoalsFor")
+                    / max(team.get("l10GamesPlayed", 1), 1),
+                    "l10_goals_against_per_game": team.get("l10GoalsAgainst")
+                    / max(team.get("l10GamesPlayed", 1), 1),
+                    # wildCardIndicator
+                    "is_wildcard_race": data.get("wildCardIndicator"),
                 }
             )
     return standings_rows
@@ -382,6 +453,154 @@ def extract_schedule():
     return rows
 
 
+def extract_player_stats():
+    rows = []
+
+    for path in (RAW_DIR / "boxscore").glob("*.json"):
+        boxscore_json = read_json(path)
+
+        if "playerByGameStats" not in boxscore_json:
+            logger.info(f"{path.stem}: no playerByGameStats, skipping")
+            continue
+
+        for team_side in ["homeTeam", "awayTeam"]:
+            if team_side not in boxscore_json["playerByGameStats"]:
+                logger.info(f"{path.stem}: no {team_side} stats, skipping")
+                continue
+
+            team = boxscore_json[team_side]
+            team_id = team["id"]
+            season = boxscore_json.get("season")
+            game_id = boxscore_json.get("id")
+            game_state = boxscore_json.get("gameState")
+
+            # --- Forwards ---
+            for p in boxscore_json["playerByGameStats"][team_side]["forwards"]:
+                rows.append(
+                    {
+                        "player_id": p["playerId"],
+                        "name": p["name"]["default"],
+                        "position": p["position"],
+                        "team_id": team_id,
+                        "season": season,
+                        "game_id": game_id,
+                        "gameState": game_state,
+                        "total_points": p.get("points", np.nan),
+                        "total_goals": p.get("goals", np.nan),
+                        "total_assists": p.get("assists", np.nan),
+                        "toi_minutes": toi_to_minutes(p.get("toi")),
+                        "pim": p.get("pim", np.nan),
+                        "hits": p.get("hits", np.nan),
+                        "powerPlayGoals": p.get("powerPlayGoals", np.nan),
+                        "sog": p.get("sog", np.nan),
+                        "faceoffWinningPctg": p.get("faceoffWinningPctg", np.nan),
+                        "blockedShots": p.get("blockedShots", np.nan),
+                        "shifts": p.get("shifts", np.nan),
+                        "giveaways": p.get("giveaways", np.nan),
+                        "takeaways": p.get("takeaways", np.nan),
+                        # Goalie fields
+                        "starter": False,
+                        "evenStrengthShotsAgainst": np.nan,
+                        "powerPlayShotsAgainst": np.nan,
+                        "shorthandedShotsAgainst": np.nan,
+                        "saveShotsAgainst": np.nan,
+                        "evenStrengthGoalsAgainst": np.nan,
+                        "powerPlayGoalsAgainst": np.nan,
+                        "shorthandedGoalsAgainst": np.nan,
+                        "goalsAgainst": np.nan,
+                        "shotsAgainst": np.nan,
+                        "saves": np.nan,
+                        "last_n_games_points": np.nan,  # заполнить позже на основе истории
+                        "rank_in_team": np.nan,  # заполнить позже на основе истории
+                    }
+                )
+
+            # --- Defense ---
+            for p in boxscore_json["playerByGameStats"][team_side]["defense"]:
+                rows.append(
+                    {
+                        "player_id": p["playerId"],
+                        "name": p["name"]["default"],
+                        "position": p["position"],
+                        "team_id": team_id,
+                        "season": season,
+                        "game_id": game_id,
+                        "gameState": game_state,
+                        "total_points": p.get("points", np.nan),
+                        "total_goals": p.get("goals", np.nan),
+                        "total_assists": p.get("assists", np.nan),
+                        "toi_minutes": toi_to_minutes(p.get("toi")),
+                        "pim": p.get("pim", np.nan),
+                        "hits": p.get("hits", np.nan),
+                        "powerPlayGoals": p.get("powerPlayGoals", np.nan),
+                        "sog": p.get("sog", np.nan),
+                        "faceoffWinningPctg": p.get("faceoffWinningPctg", np.nan),
+                        "blockedShots": p.get("blockedShots", np.nan),
+                        "shifts": p.get("shifts", np.nan),
+                        "giveaways": p.get("giveaways", np.nan),
+                        "takeaways": p.get("takeaways", np.nan),
+                        # Goalie fields
+                        "starter": False,
+                        "evenStrengthShotsAgainst": np.nan,
+                        "powerPlayShotsAgainst": np.nan,
+                        "shorthandedShotsAgainst": np.nan,
+                        "saveShotsAgainst": np.nan,
+                        "evenStrengthGoalsAgainst": np.nan,
+                        "powerPlayGoalsAgainst": np.nan,
+                        "shorthandedGoalsAgainst": np.nan,
+                        "goalsAgainst": np.nan,
+                        "shotsAgainst": np.nan,
+                        "saves": np.nan,
+                        "last_n_games_points": np.nan,  # заполнить позже на основе истории
+                        "rank_in_team": np.nan,  # заполнить позже на основе истории
+                    }
+                )
+
+            # --- Goalies ---
+            for p in boxscore_json["playerByGameStats"][team_side]["goalies"]:
+                rows.append(
+                    {
+                        "player_id": p["playerId"],
+                        "name": p["name"]["default"],
+                        "position": "G",
+                        "team_id": team_id,
+                        "season": season,
+                        "game_id": game_id,
+                        "gameState": game_state,
+                        # Player fields
+                        "total_points": np.nan,
+                        "total_goals": np.nan,
+                        "total_assists": np.nan,
+                        "toi_minutes": toi_to_minutes(p.get("toi")),
+                        "pim": p.get("pim", np.nan),
+                        "hits": np.nan,
+                        "powerPlayGoals": np.nan,
+                        "sog": np.nan,
+                        "faceoffWinningPctg": np.nan,
+                        "blockedShots": np.nan,
+                        "shifts": np.nan,
+                        "giveaways": np.nan,
+                        "takeaways": np.nan,
+                        # Goalie fields
+                        "starter": p.get("starter", False),
+                        "evenStrengthShotsAgainst": p.get("evenStrengthShotsAgainst", np.nan),
+                        "powerPlayShotsAgainst": p.get("powerPlayShotsAgainst", np.nan),
+                        "shorthandedShotsAgainst": p.get("shorthandedShotsAgainst", np.nan),
+                        "saveShotsAgainst": p.get("saveShotsAgainst", np.nan),
+                        "evenStrengthGoalsAgainst": p.get("evenStrengthGoalsAgainst", np.nan),
+                        "powerPlayGoalsAgainst": p.get("powerPlayGoalsAgainst", np.nan),
+                        "shorthandedGoalsAgainst": p.get("shorthandedGoalsAgainst", np.nan),
+                        "goalsAgainst": p.get("goalsAgainst", np.nan),
+                        "shotsAgainst": p.get("shotsAgainst", np.nan),
+                        "saves": p.get("saves", np.nan),
+                        "last_n_games_points": np.nan,  # заполнить позже на основе истории
+                        "rank_in_team": np.nan,  # заполнить позже на основе истории
+                    }
+                )
+
+    return rows
+
+
 def write_csv(rows, csv_name):
     # -----------------------
     # запись в CSV
@@ -416,6 +635,9 @@ def main():
 
     schedule_rows = extract_schedule()
     write_csv(schedule_rows, "schedule_games.csv")
+
+    player_stats = extract_player_stats()
+    write_csv(player_stats, "player_stats.csv")
 
 
 if __name__ == "__main__":

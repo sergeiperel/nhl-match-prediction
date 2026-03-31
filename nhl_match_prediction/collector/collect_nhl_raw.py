@@ -71,12 +71,12 @@ def process_rosters(landing: dict) -> None:
     for team in (home_team, away_team):
         if team and season:
             roster_key = f"{team}_{season}"
-            if not file_exists("rosters", roster_key):
-                try:
-                    roster = fetch(ENDPOINTS["roster"](team, season))
-                    save_json("rosters", roster_key, roster)
-                except Exception as e:
-                    print(f"roster failed {team}:", e)
+            # if not file_exists("rosters", roster_key):
+            try:
+                roster = fetch(ENDPOINTS["roster"](team, season))
+                save_json("rosters", roster_key, roster)
+            except Exception as e:
+                print(f"roster failed {team}:", e)
 
 
 def process_game(game: dict, seen_games: set[int]) -> bool:
@@ -103,9 +103,9 @@ def process_game(game: dict, seen_games: set[int]) -> bool:
         print(f"boxscore failed {game_id}:", e)
 
     try:
-        if not file_exists("playbyplay", str(game_id)):
-            pbp = fetch(ENDPOINTS["playbyplay"](game_id))
-            save_json("playbyplay", str(game_id), pbp)
+        # if not file_exists("playbyplay", str(game_id)):
+        pbp = fetch(ENDPOINTS["playbyplay"](game_id))
+        save_json("playbyplay", str(game_id), pbp)
     except Exception as e:
         print(f"playbyplay failed {game_id}:", e)
 

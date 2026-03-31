@@ -23,12 +23,17 @@ def prepare_data(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
         "game_date",
         "home_team_abbr",
         "away_team_abbr",
+        "neutral_site",
+        "season",
+        "game_type",
+        "home_team_id",
+        "away_team_id",
     ]
 
     dup_cols = [c for c in df.columns if ":1" in c]
     drop_cols += dup_cols
 
-    x = df.drop(columns=[*drop_cols, "home_win"])
+    x = df.drop(columns=[c for c in drop_cols if c in df.columns] + ["home_win"])
     y = df["home_win"]
 
     return x, y
@@ -37,7 +42,7 @@ def prepare_data(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
 def time_split(
     x: pd.DataFrame,
     y: pd.Series,
-    test_size: float = 0.2,
+    test_size: float = 0.3,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
     split_idx = int(len(x) * (1 - test_size))
 
@@ -131,8 +136,7 @@ def train_logistic(
 
     x_train, x_test, y_train, y_test = time_split(x, y)
 
-    if params is None:
-        params = {"max_iter": 1000, "solver": "lbfgs"}
+    print(params)
 
     model = build_model(params)
     model.fit(x_train, y_train)

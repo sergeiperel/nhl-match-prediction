@@ -61,7 +61,7 @@ def main(cfg: DictConfig):
     for metric_name, metric_value in metrics.items():
         logger.info(f"{metric_name}: {metric_value:.4f}")
 
-    model_file = log_dir / "model.joblib"
+    model_file = log_dir / "model2.joblib"
     joblib.dump(model, model_file)
     logger.info(f"Model saved to {model_file.resolve()}")
 
