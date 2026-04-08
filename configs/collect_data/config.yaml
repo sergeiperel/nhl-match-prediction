@@ -2,21 +2,30 @@ defaults:
   - _self_
 
 date:
-  start: 2026-03-11
-  end: 2026-03-14
+  start: 2026-03-28
+  end: 2026-04-30
 
 pipeline:
-  fail_fast: false
+  fail_fast: true
   log_level: INFO
 
 steps:
-  collect_raw: true
-  collect_standings: true
-  build_features: true
-  json_to_csv: true
-  load_sqlite: true
+  collect_raw: false
+  collect_standings: false
+  build_features: false
+  json_to_csv: false
+
+  build_games_with_features: false
+  standings_features: false
+  build_goalie_features: false
+  build_player_features: false
+
+  load_sqlite: false
   build_match_features: true
+  build_future_games_features: true
+  build_upcoming_match_features: true
   export_match_features: true
+
 
 
 hydra:
