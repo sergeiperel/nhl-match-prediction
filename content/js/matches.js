@@ -1,5 +1,6 @@
 let activeDate = null
 let allMatches = []
+let currentMatches = []
 
 
 function getMatchStatus(iso){
@@ -55,8 +56,6 @@ function createDateButtons(){
     const container = document.getElementById("dateButtons")
 
     const today = new Date()
-
-    const labels = ["Today","Tomorrow"]
 
     const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"]
 
@@ -173,7 +172,7 @@ function renderMatches(){
 
     let currentDay = null
 
-    matches.forEach(match=>{
+    matches.forEach((match) => {
 
         const matchDate = new Date(match.game_date)
         const dayKey = formatDate(matchDate)
@@ -229,8 +228,9 @@ function renderMatches(){
             div.classList.add("ring-2","ring-red-500")
         }
 
-        const homeProb = Math.round((match.prediction_prob ?? 0.5) * 100)
-        const awayProb = 100 - homeProb
+        const homeProbRaw = (match.prediction_prob ?? 0.5) * 100
+        const homeProb = Number(homeProbRaw.toFixed(1))
+        const awayProb = Number((100 - homeProbRaw).toFixed(1))
 
         const homeColor = homeProb > awayProb ? "text-green-400" : "text-white"
         const awayColor = awayProb > homeProb ? "text-red-400" : "text-white"
@@ -246,10 +246,10 @@ function renderMatches(){
     <div class="flex justify-between items-center mb-4">
 
     <div class="flex items-center gap-3">
-    <img src="${match.home_team_logo}" class="w-16 h-16 rounded-full bg-white p-0.5 object-contain">
-    <div class="text-xl font-semibold ${homeColor}">
-    ${match.home_team_abbr}
-    </div>
+        <img src="${match.home_team_logo}" class="w-16 h-16 rounded-full bg-white p-0.5 object-contain">
+        <div class="text-xl font-semibold ${homeColor}">
+            ${match.home_team_abbr}
+        </div>
     </div>
 
     <div class="text-xl font-semibold text-slate-400">
@@ -259,10 +259,10 @@ function renderMatches(){
     ${score}
 
     <div class="flex items-center gap-3">
-    <div class="text-xl font-semibold ${awayColor}">
-    ${match.away_team_abbr}
-    </div>
-    <img src="${match.away_team_logo}" class="w-16 h-16 rounded-full bg-white p-0.5 object-contain">
+        <div class="text-xl font-semibold ${awayColor}">
+            ${match.away_team_abbr}
+        </div>
+        <img src="${match.away_team_logo}" class="w-16 h-16 rounded-full bg-white p-0.5 object-contain">
     </div>
 
     </div>
@@ -288,23 +288,30 @@ function renderMatches(){
     </div>
 
     <div class="text-center text-base text-slate-400">
-    ${formatDateTime(match.game_date)}
+        ${formatDateTime(match.game_date)}
     </div>
 
+    <div class="text-center text-base text-slate-400">
+        ${match.arena ? `📍 ${match.arena}` : ""}
+    </div>
+
+    <button
+        onclick="showExplanation('${String(match.game_id)}')"
+        class="mt-4 px-3 py-1.5 text-sm bg-slate-700 hover:bg-slate-600 rounded-lg"
+    >
+    Объяснение
+    </button>
+
     `
-
         container.appendChild(div)
-
     })
-
-
 
 }
 
 async function loadMatches() {
 
     try {
-        const response = await fetch("predict_upcoming")
+        const response = await fetch("/api/predict_upcoming")
 
         if (!response.ok) {
             throw new Error("API error")
@@ -317,6 +324,7 @@ async function loadMatches() {
             allMatches = []
         } else {
             allMatches = data
+            currentMatches = data
         }
 
         renderMatches()
@@ -325,6 +333,149 @@ async function loadMatches() {
         console.error("Failed to load matches:", e)
     }
 
+}
+
+
+async function loadUpcomingPreview() {
+
+
+    const container = document.getElementById("upcoming-preview");
+
+    if (!container) return
+
+    try {
+        const response = await fetch("/api/upcoming_preview")
+
+        if (!response.ok) {
+            throw new Error("API error")
+        }
+
+        const matches = await response.json()
+
+        container.innerHTML = ""
+
+        matches.forEach(match => {
+
+            const homeProb = Math.round((match.prediction_prob ?? 0.5) * 100)
+            const awayProb = 100 - homeProb
+
+            const div = document.createElement("div")
+
+            div.className =
+            "rounded-2xl border border-slate-800 bg-slate-950/70 px-4 sm:px-5 py-3.5 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+
+            div.innerHTML = `
+                <div class="flex items-center gap-3 sm:gap-4">
+
+                    <div class="flex flex-col items-center gap-1">
+                        <img src="${match.home_team_logo}" class="h-16 w-16"/>
+                        <span class="text-[11px] text-slate-400">${match.home_team_abbr}</span>
+                    </div>
+
+                    <div class="text-xs text-slate-400">vs</div>
+
+                    <div class="flex flex-col items-center gap-1">
+                        <img src="${match.away_team_logo}" class="h-16 w-16"/>
+                        <span class="text-[11px] text-slate-400">${match.away_team_abbr}</span>
+                    </div>
+
+                    <div class="hidden sm:flex flex-col ml-3 text-[11px] text-slate-400">
+                        <span>${formatDateTime(match.game_date)}</span>
+                        <span>${match.arena ?? ""}</span>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto">
+                    <div class="flex flex-col text-[11px] text-slate-400">
+                        <span>
+                            ${match.home_team_abbr}:
+                            <span class="text-green-400 font-semibold">${homeProb}%</span>
+                        </span>
+                        <span>
+                            ${match.away_team_abbr}:
+                            <span class="text-red-200 font-semibold">${awayProb}%</span>
+                        </span>
+                    </div>
+
+                    <button
+                        onclick="showExplanation('${String(match.game_id)}')"
+                        class="inline-flex items-center justify-center px-3 py-1.5 text-[11px] font-medium rounded-lg bg-slate-900 border border-slate-700/80 hover:border-accent/80 hover:text-white transition-colors">
+                        Подробнее
+                    </button>
+                </div>
+            `
+
+            container.appendChild(div)
+        })
+
+    } catch (e) {
+        console.error("Preview load error:", e)
+    }
+}
+
+
+async function loadAccuracy() {
+    try {
+        const response = await fetch("/api/accuracy")
+
+        if (!response.ok) {
+            throw new Error("Failed to load accuracy")
+        }
+
+        const data = await response.json()
+
+        const el = document.getElementById("accuracy-value")
+
+        if (!el) return
+
+        el.textContent = `${data.accuracy}%`
+
+    } catch (e) {
+        console.error("Accuracy load error:", e)
+    }
+}
+
+function showExplanation(gameId) {
+    const match = allMatches.find(m => String(m.game_id) === String(gameId))
+
+    if (!match || !match.explanation) return
+
+    const modal = document.createElement("div")
+
+    modal.className = `
+        fixed inset-0 bg-black/70 flex items-center justify-center z-50
+    `
+
+    const explanationHtml = match.explanation.map(e => `
+        <div class="flex justify-between items-center mb-2">
+            <span class="text-sm text-slate-200">${e.feature}</span>
+
+            <span class="${
+                e.impact > 0 ? "text-green-400" : "text-red-400"
+            }">
+                ${e.impact.toFixed(3)}
+            </span>
+        </div>
+    `).join("")
+
+    modal.innerHTML = `
+        <div class="bg-slate-900 p-6 rounded-xl w-[400px] border border-slate-700">
+            <h2 class="text-lg font-semibold mb-4 text-white">
+                Объяснение прогноза
+            </h2>
+
+            ${explanationHtml}
+
+            <button
+                onclick="this.closest('.fixed').remove()"
+                class="mt-4 w-full bg-blue-600 hover:bg-blue-500 py-2 rounded-lg"
+            >
+                Закрыть
+            </button>
+        </div>
+    `
+
+    document.body.appendChild(modal)
 }
 
 document.getElementById("dateFilter").addEventListener("change",(e)=>{
@@ -342,4 +493,8 @@ document.getElementById("dateFilter").addEventListener("change",(e)=>{
 
 createDateButtons()
 
+loadAccuracy()
+
 loadMatches()
+
+loadUpcomingPreview()

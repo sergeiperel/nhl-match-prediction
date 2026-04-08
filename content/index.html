@@ -108,7 +108,8 @@
 
                 <div class="grid grid-cols-3 gap-4 text-xs sm:text-sm text-slate-300">
                   <div>
-                    <div class="font-semibold text-white text-base sm:text-lg">72%</div>
+                    <!-- <div class="font-semibold text-white text-base sm:text-lg">72%</div> -->
+                    <div class="font-semibold text-white text-base sm:text-lg" id="accuracy-value">—</div>
                     <div class="text-slate-400 text-[11px] sm:text-xs">Средняя точность предсказаний исхода матчей</div>
                   </div>
                   <div>
@@ -308,7 +309,7 @@
               <div>
                 <h2 class="text-xl sm:text-2xl font-semibold text-white mb-2">Ближайшие матчи НХЛ</h2>
                 <p class="text-sm text-slate-300 max-w-xl">
-                  Демонстрационный виджет. В продакшене здесь будут live-данные из вашей модели.
+                  Прогнозы формируются моделью машинного обучения на основе исторических данных и актуальных метрик команд.
                 </p>
               </div>
               <a href="#/matches"
@@ -317,63 +318,8 @@
               </a>
             </div>
 
-            <div class="grid gap-4 lg:gap-5">
-              <!-- Match row -->
-              <div class="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 sm:px-5 py-3.5 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div class="flex items-center gap-3 sm:gap-4">
-                  <div class="flex flex-col items-center gap-1">
-                    <div class="h-8 w-8 rounded-lg bg-slate-800 flex items-center justify-center text-[11px] font-semibold">NYR</div>
-                    <span class="text-[11px] text-slate-400">NY Rangers</span>
-                  </div>
-                  <div class="text-xs text-slate-400">vs</div>
-                  <div class="flex flex-col items-center gap-1">
-                    <div class="h-8 w-8 rounded-lg bg-slate-800 flex items-center justify-center text-[11px] font-semibold">BOS</div>
-                    <span class="text-[11px] text-slate-400">Boston Bruins</span>
-                  </div>
-                  <div class="hidden sm:flex flex-col ml-3 text-[11px] text-slate-400">
-                    <span>Завтра, 19:30 (ET)</span>
-                    <span>Madison Square Garden</span>
-                  </div>
-                </div>
-                <div class="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto">
-                  <div class="flex flex-col text-[11px] text-slate-400">
-                    <span>Вероятность NYR: <span class="text-emerald-400 font-semibold">55%</span></span>
-                    <span>Вероятность BOS: <span class="text-slate-200 font-semibold">45%</span></span>
-                  </div>
-                  <button class="inline-flex items-center justify-center px-3 py-1.5 text-[11px] font-medium rounded-lg bg-slate-900 border border-slate-700/80 hover:border-accent/80 hover:text-white transition-colors">
-                    Подробнее
-                  </button>
-                </div>
-              </div>
+           <div id="upcoming-preview" class="grid gap-4 lg:gap-5"></div>
 
-              <div class="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 sm:px-5 py-3.5 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div class="flex items-center gap-3 sm:gap-4">
-                  <div class="flex flex-col items-center gap-1">
-                    <div class="h-8 w-8 rounded-lg bg-slate-800 flex items-center justify-center text-[11px] font-semibold">VGK</div>
-                    <span class="text-[11px] text-slate-400">Vegas Golden Knights</span>
-                  </div>
-                  <div class="text-xs text-slate-400">vs</div>
-                  <div class="flex flex-col items-center gap-1">
-                    <div class="h-8 w-8 rounded-lg bg-slate-800 flex items-center justify-center text-[11px] font-semibold">EDM</div>
-                    <span class="text-[11px] text-slate-400">Edmonton Oilers</span>
-                  </div>
-                  <div class="hidden sm:flex flex-col ml-3 text-[11px] text-slate-400">
-                    <span>Через 2 дня, 22:00 (ET)</span>
-                    <span>T-Mobile Arena</span>
-                  </div>
-                </div>
-                <div class="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto">
-                  <div class="flex flex-col text-[11px] text-slate-400">
-                    <span>Тотал 5.5: <span class="text-sky-400 font-semibold">вероятен over</span></span>
-                    <span>Модель xG: <span class="text-slate-200 font-semibold">6.4 гола</span></span>
-                  </div>
-                  <button class="inline-flex items-center justify-center px-3 py-1.5 text-[11px] font-medium rounded-lg bg-slate-900 border border-slate-700/80 hover:border-accent/80 hover:text-white transition-colors">
-                    Подробнее
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
         </section>
 
         <!-- How it works -->
@@ -549,6 +495,7 @@
 
       } else {
         document.getElementById("page-home").classList.remove("hidden");
+        // loadUpcomingPreview();
       }
     }
 
