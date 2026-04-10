@@ -35,7 +35,7 @@ def dms_to_dd(coord_str: str):
         return lat, lon
 
     dms_match = re.search(
-        r"(\d+)°(\d+)'([\d.]+)″\s*([NS])\s*(\d+)°(\d+)'([\d.]+)″\s*([EW])",
+        r"(\d+)°(\d+)'([\d.]+)\"\s*([NS])\s*(\d+)°(\d+)'([\d.]+)\"\s*([EW])",
         coord_str,
     )
 
