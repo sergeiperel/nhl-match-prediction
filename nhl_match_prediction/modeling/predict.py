@@ -16,11 +16,6 @@ DB_PATH = BASE_DIR / "data" / "sql" / "nhl.db"
 def load_upcoming_matches() -> pd.DataFrame:
     engine = create_engine(f"sqlite:///{DB_PATH}")
 
-    # query = """
-    # SELECT *
-    # FROM upcoming_match_features
-    # """
-
     query = """
         SELECT *
         FROM match_features
@@ -39,31 +34,19 @@ def main(cfg: DictConfig):
 
     logger.info("=== Prediction step ===")
 
-    logger.info("Loading upcoming matches from SQL")
-
     df = load_upcoming_matches()
 
-    meta_cols = [
-        "game_id",
-        "game_date",
-        "home_team_abbr",
-        "away_team_abbr",
-    ]
-
+    meta_cols = ["game_id", "game_date", "home_team_abbr", "away_team_abbr"]
     meta = df[meta_cols]
 
     x, _ = prepare_data(df)
 
-    logger.info(f"Upcoming matches: {len(x)}")
-
-    models = ["logistic", "random_forest"]
+    models = {"logistic": "model2.joblib", "random_forest": "model2.joblib"}
 
     results = meta.copy()
 
-    for model_name in models:
-        model_file = root / "logs" / model_name / "model.joblib"
-
-        logger.info(f"Loading model {model_name} from {model_file}")
+    for model_name, model_filename in models.items():
+        model_file = root / "logs" / model_name / model_filename
 
         model = joblib.load(model_file)
 
@@ -71,16 +54,13 @@ def main(cfg: DictConfig):
 
         results[f"{model_name}_proba"] = proba
 
-    results["avg_proba"] = results[[f"{m}_proba" for m in models]].mean(axis=1)
+    results["avg_proba"] = results[[f"{model_name}_proba" for model_name in models]].mean(axis=1)
 
-    output_dir = root / "predictions"
-    output_dir.mkdir(exist_ok=True)
+    engine = create_engine(f"sqlite:///{DB_PATH}")
 
-    output_file = output_dir / "upcoming_predictions.csv"
+    results.to_sql("predictions", engine, if_exists="replace", index=False)
 
-    results.to_csv(output_file, index=False)
-
-    logger.info(f"Predictions saved to {output_file}")
+    logger.info("Predictions saved to DB")
 
     logger.info("=== Prediction step done ===")
 

@@ -1,5 +1,3 @@
-# nhl_match_prediction/modeling/models/logistic.py
-
 from pathlib import Path
 
 import joblib
@@ -28,6 +26,7 @@ def prepare_data(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
         "game_type",
         "home_team_id",
         "away_team_id",
+        "arena",
     ]
 
     dup_cols = [c for c in df.columns if ":1" in c]

@@ -7,8 +7,11 @@ from sklearn.metrics import (
     log_loss,
     roc_auc_score,
 )
+from sqlalchemy import create_engine
 
 BASE_DIR = Path(__file__).resolve().parents[2]
+DB_PATH = BASE_DIR / "data" / "sql" / "nhl.db"
+
 THRESHOLD = 0.5
 
 
@@ -24,16 +27,20 @@ def evaluate_model(y_true, proba):
 
 
 def main():
-    predictions_path = BASE_DIR / "predictions" / "upcoming_predictions.csv"
+    engine = create_engine(f"sqlite:///{DB_PATH}")
 
-    results_path = BASE_DIR / "data" / "processed" / "match_features.csv"
+    df = pd.read_sql(
+        """
+        SELECT pr.*, home_win
+        FROM predictions pr
+        LEFT JOIN match_features m
+            on pr.game_id = m.game_id
+        WHERE home_win IS NOT NULL
+    """,
+        engine,
+    )
 
-    preds = pd.read_csv(predictions_path)
-    results = pd.read_csv(results_path)
-
-    df = preds.merge(results, on="game_id")
-
-    y_true = df["home_win"]
+    df["game_date"] = pd.to_datetime(df["game_date"]).dt.date
 
     models = {
         "logistic": df["logistic_proba"],
@@ -41,13 +48,21 @@ def main():
         "ensemble": df["avg_proba"],
     }
 
+    all_metrics = []
+
     for model_name, proba in models.items():
-        metrics = evaluate_model(y_true, proba)
+        metrics = evaluate_model(df["home_win"], proba)
 
         print(f"=== {model_name.upper()} ===")
+        print(metrics)
 
-        for name, value in metrics.items():
-            print(f"{name}: {value:.4f}")
+        all_metrics.append({"model": model_name, **metrics})
+
+    metrics_df = pd.DataFrame(all_metrics)
+
+    metrics_df.to_sql("metrics", engine, if_exists="replace", index=False)
+
+    print("Saved to DB → metrics table")
 
 
 if __name__ == "__main__":
