@@ -659,11 +659,14 @@ def build_match_features() -> None:
         WITH base AS (
             SELECT
                 *,
+                g.date as game_date,
                 ROW_NUMBER() OVER (
-                    PARTITION BY team_id, season
-                    ORDER BY game_id
+                    PARTITION BY p.team_id, p.season
+                    ORDER BY g.date
                 ) AS rn
-            FROM player_stats_features
+            FROM player_stats_features p
+            LEFT JOIN games g
+                ON p.game_id = g.game_id
         ),
 
         rolling AS (
@@ -671,6 +674,7 @@ def build_match_features() -> None:
                 game_id,
                 team_id,
                 season,
+                game_date,
 
                 -- === Командные очки и суммарные фичи ===
                 AVG(team_points_total) OVER w5 AS team_points_last5,
@@ -697,7 +701,9 @@ def build_match_features() -> None:
                 AVG(goalie_save_pct) OVER w5 AS goalie_save_pct_last5,
                 AVG(goalie_goals_against) OVER w5 AS goalie_goals_against_last5,
                 AVG(goalie_shots_against) OVER w5 AS goalie_shots_against_last5,
-                SUM(goalie_played_full_game) OVER w5 AS goalie_played_full_last5
+                SUM(goalie_played_full_game) OVER w5 AS goalie_played_full_last5,
+
+                AVG(goalie_save_pct) OVER w10 AS goalie_save_pct_last10
 
             FROM base
             WINDOW
@@ -705,6 +711,11 @@ def build_match_features() -> None:
                     PARTITION BY team_id, season
                     ORDER BY game_id
                     ROWS BETWEEN 5 PRECEDING AND 1 PRECEDING
+                ),
+                w10 AS (
+                    PARTITION BY team_id, season
+                    ORDER BY game_id
+                    ROWS BETWEEN 10 PRECEDING AND 1 PRECEDING
                 )
         )
 
@@ -794,7 +805,8 @@ def build_match_features() -> None:
             psf.goalie_save_pct_last5,
             psf.goalie_goals_against_last5,
             psf.goalie_shots_against_last5,
-            psf.goalie_played_full_last5
+            psf.goalie_played_full_last5,
+            psf.goalie_save_pct_last10
 
         FROM team_features_with_standings t
 
