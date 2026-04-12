@@ -230,3 +230,6 @@ predictions/
 
 # artifacts
 nhl_match_prediction/modeling/artifacts/
+
+# visualization folder
+visualizations/

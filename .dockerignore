@@ -9,20 +9,19 @@ __pycache__/
 *.pyo
 
 # Data
-#data/**
-!data/sql/**
-!data/**/*.dvc
+data/
+# !data/sql/
+
 
 # Predictions / artifacts
-predictions/**
-!predictions/**/*.dvc
-nhl_match_prediction/modeling/artifacts/**
-!nhl_match_prediction/modeling/artifacts/**/*.dvc
+predictions/
+# !predictions/**/*.dvc
+nhl_match_prediction/modeling/artifacts/
+# !nhl_match_prediction/modeling/artifacts/**/*.dvc
 
 # Logs / notebooks
-#logs/
+logs/
 notebooks/
-!notebooks/.gitkeep
 
 # IDE / configs
 .idea/
@@ -32,9 +31,10 @@ notebooks/
 .gitignore
 
 # Large files (recursive)
-**/*.pkl
-**/*.h5
-**/*.csv
+*.pkl
+*.joblib
+*.csv
 
 # DVC metadata
 .dvc/
+.dvc/cache/
