@@ -13,8 +13,17 @@ from nhl_match_prediction.etl_pipeline.export_match_features import (
 )
 from nhl_match_prediction.etl_pipeline.json_to_csv import main as json_to_csv_main
 from nhl_match_prediction.etl_pipeline.load_to_db import main as load_sqlite_main
-from nhl_match_prediction.etl_pipeline.upcoming_match_features import upcoming_match_features
-from nhl_match_prediction.features.build_features import build_play_by_play_dataset
+from nhl_match_prediction.games_features.build_games_features import build_games_with_features
+from nhl_match_prediction.goalie_features.build_goalie_features import build_goalie_features
+from nhl_match_prediction.pbp_features.build_features import build_play_by_play_dataset
+from nhl_match_prediction.player_stats_features.build_player_stats_features import (
+    build_player_features,
+)
+from nhl_match_prediction.standings_features.build_standings_features import (
+    build_standings_daily_features,
+)
+from nhl_match_prediction.upcoming_features.future_games_features import build_future_games_features
+from nhl_match_prediction.upcoming_features.upcoming_match_features import upcoming_match_features
 from pipeline_runner import PipelineRunner
 
 
@@ -96,6 +105,30 @@ def main(cfg: DictConfig):
     )
 
     runner.run_step(
+        name="build_games_with_features",
+        func=build_games_with_features,
+        enabled=cfg.steps.build_games_with_features,
+    )
+
+    runner.run_step(
+        name="build_standings_daily_features",
+        func=build_standings_daily_features,
+        enabled=cfg.steps.standings_features,
+    )
+
+    runner.run_step(
+        name="build_goalie_features",
+        func=build_goalie_features,
+        enabled=cfg.steps.build_goalie_features,
+    )
+
+    runner.run_step(
+        name="build_player_features",
+        func=build_player_features,
+        enabled=cfg.steps.build_player_features,
+    )
+
+    runner.run_step(
         name="Load to SQLite",
         func=load_sqlite_main,
         enabled=cfg.steps.load_sqlite,
@@ -108,9 +141,15 @@ def main(cfg: DictConfig):
     )
 
     runner.run_step(
+        name="Future Matches Features",
+        func=build_future_games_features,
+        enabled=cfg.steps.build_future_games_features,
+    )
+
+    runner.run_step(
         name="Build Upcoming Match Features",
         func=upcoming_match_features,
-        enabled=cfg.steps.build_match_features,
+        enabled=cfg.steps.build_upcoming_match_features,
     )
 
     runner.run_step(
