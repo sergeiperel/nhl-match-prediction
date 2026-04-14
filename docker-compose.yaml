@@ -1,8 +1,8 @@
 services:
   redis:
     image: redis
-    ports:
-      - "6379:6379"
+    # ports:
+    #   - "6379:6379"
     volumes:
       - redis-volume:/data
     networks:
@@ -34,8 +34,10 @@ services:
 
   backend:
     build: .
-    # ports:
-    #   - "8089:8089"
+    env_file:
+      - .env
+    ports:
+      - "8089:8089"
 
     volumes:
     - .:/app
@@ -67,6 +69,35 @@ services:
     depends_on:
       - redis
       - backend
+    env_file:
+      - .env
+    environment:
+      - PYTHONPATH=/app
+
+  beat:
+    build: .
+    command: celery -A nhl_match_prediction.tasks.celery_app:celery_app beat --loglevel=info
+    volumes:
+      - .:/app
+    networks:
+      - net-back
+    env_file:
+      - .env
+    environment:
+      - PYTHONPATH=/app
+
+  bot:
+    build: .
+    command: python bot.py
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+    networks:
+      - net-back
+    depends_on:
+      - backend
+      - redis
     environment:
       - PYTHONPATH=/app
 
