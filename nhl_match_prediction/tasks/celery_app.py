@@ -10,5 +10,15 @@ celery_app = Celery(
 
 celery_app.conf.update(
     task_track_started=True,
-    include=["nhl_match_prediction.tasks.train_tasks"],
+    include=[
+        "nhl_match_prediction.tasks.train_tasks",
+        "nhl_match_prediction.notifications.scheduler",
+    ],
 )
+
+celery_app.conf.beat_schedule = {
+    "check-upcoming-games-every-minute": {
+        "task": "nhl_match_prediction.notifications.scheduler.schedule_notifications",
+        "schedule": 60.0,
+    },
+}
