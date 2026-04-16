@@ -405,11 +405,19 @@ def extract_rosters():
             else:
                 position_group = "G"
 
+            first_name = player.get("firstName", {}).get("default")
+            last_name = player.get("lastName", {}).get("default")
+            birth_city = player.get("birthCity", {}).get("default")
+
             roster_rows.append(
                 {
                     "team_abbrev": team,
                     "season": season,
                     "player_id": player.get("id"),
+                    "headshot": player.get("headshot"),
+                    "first_name": first_name,
+                    "last_name": last_name,
+                    "sweater_number": player.get("sweaterNumber"),
                     "position": position,
                     "position_group": position_group,
                     "shoots_catches": player.get("shootsCatches"),
@@ -417,6 +425,7 @@ def extract_rosters():
                     "weight_kg": weight_kg,
                     "bmi": bmi,
                     "birth_date": player.get("birthDate"),
+                    "birth_city": birth_city,
                     "birth_country": player.get("birthCountry"),
                 }
             )
