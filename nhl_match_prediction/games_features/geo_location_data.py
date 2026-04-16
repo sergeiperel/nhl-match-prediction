@@ -20,6 +20,15 @@ def dms_to_dd(coord_str: str):
 
     coord_str = coord_str.replace("\xa0", " ").strip()
 
+    coord_str = coord_str.replace("″", '"')
+    coord_str = re.sub(r"(\d)\s+(\d)", r"\1\2", coord_str)
+
+    coord_str = re.sub(r"\s*°\s*", "°", coord_str)
+    coord_str = re.sub(r"\s*'\s*", "'", coord_str)
+    coord_str = re.sub(r'\s*"\s*', '"', coord_str)
+
+    coord_str = coord_str.strip()
+
     decimal_match = re.search(r"([0-9.]+)°\s*([NS])\s*([0-9.]+)°\s*([EW])", coord_str)
 
     if decimal_match:
