@@ -770,18 +770,10 @@ def build_match_features() -> None:
 
             -- ===== SPECIAL TEAMS (ИСПРАВЛЕНО) =====
             -- PP%
-            CASE
-                WHEN pb.home_pp_opportunities > 0
-                THEN pb.home_pp_goals * 1.0 / pb.home_pp_opportunities
-                ELSE 0
-            END AS pp_pct,
+            pb.pp_eff_season AS pp_pct,
 
             -- PK% (исправленный расчёт)
-            CASE
-                WHEN pb.home_pk_opportunities > 0
-                THEN 1.0 - (pb.home_pk_goals_against * 1.0 / pb.home_pk_opportunities)
-                ELSE 0
-            END AS pk_pct,
+            pb.pk_eff_season AS pk_pct,
 
             -- ===== PLAYER FEATURES =====
             psf.team_points_last5,
