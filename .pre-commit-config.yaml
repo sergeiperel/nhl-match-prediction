@@ -43,7 +43,7 @@ repos:
     hooks:
       - id: codespell
         exclude: ^notebooks/.*\.ipynb$
-        args: ["--ignore-words-list=toi,OT"]
+        args: ["--ignore-words-list=toi,OT,fpr,tpr"]
         additional_dependencies: [tomli]
 
   - repo: https://github.com/shellcheck-py/shellcheck-py
