@@ -10,6 +10,7 @@ celery_app = Celery(
 
 celery_app.conf.update(
     task_track_started=True,
+    result_expires=3600,
     include=[
         "nhl_match_prediction.tasks.train_tasks",
         "nhl_match_prediction.notifications.scheduler",
