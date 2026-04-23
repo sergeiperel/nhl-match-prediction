@@ -3,16 +3,6 @@ from datetime import date, datetime
 from pathlib import Path
 
 import hydra
-from omegaconf import DictConfig
-
-from nhl_match_prediction.collector.collect_nhl_raw import collect_season
-from nhl_match_prediction.collector.collect_standings import collect_standings
-from nhl_match_prediction.etl_pipeline.build_match_features import build_match_features
-from nhl_match_prediction.etl_pipeline.export_match_features import (
-    main as export_match_features_main,
-)
-from nhl_match_prediction.etl_pipeline.json_to_csv import main as json_to_csv_main
-from nhl_match_prediction.etl_pipeline.load_to_db import main as load_sqlite_main
 from nhl_match_prediction.games_features.build_games_features import build_games_with_features
 from nhl_match_prediction.goalie_features.build_goalie_features import build_goalie_features
 from nhl_match_prediction.pbp_features.build_features import build_play_by_play_dataset
@@ -22,9 +12,20 @@ from nhl_match_prediction.player_stats_features.build_player_stats_features impo
 from nhl_match_prediction.standings_features.build_standings_features import (
     build_standings_daily_features,
 )
+from nhl_match_prediction.xg_scores_model.xg_utils import build_xg_dataset, update_xg_features
+from omegaconf import DictConfig
+from pipeline_runner import PipelineRunner
+
+from nhl_match_prediction.collector.collect_nhl_raw import collect_season
+from nhl_match_prediction.collector.collect_standings import collect_standings
+from nhl_match_prediction.etl_pipeline.build_match_features import build_match_features
+from nhl_match_prediction.etl_pipeline.export_match_features import (
+    main as export_match_features_main,
+)
+from nhl_match_prediction.etl_pipeline.json_to_csv import main as json_to_csv_main
+from nhl_match_prediction.etl_pipeline.load_to_db import main as load_sqlite_main
 from nhl_match_prediction.upcoming_features.future_games_features import build_future_games_features
 from nhl_match_prediction.upcoming_features.upcoming_match_features import upcoming_match_features
-from pipeline_runner import PipelineRunner
 
 
 def setup_logging(level: str = "INFO"):
@@ -63,7 +64,14 @@ def str_to_date(s: str) -> date:
 @hydra.main(config_path="configs/collect_data", config_name="config", version_base=None)
 def main(cfg: DictConfig):
     setup_logging(cfg.pipeline.log_level)
+
     logger = logging.getLogger(__name__)
+
+    mode = cfg.pipeline.mode
+    logger.info(f"Pipeline mode: {mode}")
+
+    is_full = mode == "full"
+    is_incremental = mode == "incremental"
 
     start_date = str_to_date(cfg.date.start)
     end_date = str_to_date(cfg.date.end)
@@ -76,6 +84,7 @@ def main(cfg: DictConfig):
 
     runner.start_pipeline()
 
+    # ===================  Collecting data  =================== #
     runner.run_step(
         name="Collect Raw Data",
         func=collect_season,
@@ -91,11 +100,24 @@ def main(cfg: DictConfig):
         start_date=start_date,
         end_date=end_date,
     )
+    # ========================================================= #
+
+    runner.run_step(
+        name="Build XG Dataset",
+        func=build_xg_dataset,
+        enabled=is_full,
+    )
+
+    runner.run_step(
+        name="Update XG Features",
+        func=update_xg_features,
+        enabled=is_incremental,
+    )
 
     runner.run_step(
         name="Build Features",
         func=build_play_by_play_dataset,
-        enabled=cfg.steps.build_features,
+        enabled=cfg.steps.build_pbp_features and is_full,
     )
 
     runner.run_step(
@@ -107,7 +129,7 @@ def main(cfg: DictConfig):
     runner.run_step(
         name="build_games_with_features",
         func=build_games_with_features,
-        enabled=cfg.steps.build_games_with_features,
+        enabled=cfg.steps.build_games_with_features and is_full,
     )
 
     runner.run_step(
@@ -137,7 +159,7 @@ def main(cfg: DictConfig):
     runner.run_step(
         name="Build Match Features",
         func=build_match_features,
-        enabled=cfg.steps.build_match_features,
+        enabled=cfg.steps.build_match_features and is_full,
     )
 
     runner.run_step(
