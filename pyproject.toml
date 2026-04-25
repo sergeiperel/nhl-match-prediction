@@ -34,7 +34,6 @@ build-backend = "poetry.core.masonry.api"
 [tool.ruff]
 line-length = 100
 format = { docstring-code-format = true }
-ignore = ["N812"]
 
 [tool.ruff.lint]
 select = [
@@ -70,6 +69,12 @@ select = [
     "PL",
     # refurb - also may be overwhelming
     "FURB",
+]
+
+ignore = [
+    "N812",
+    "N803",  # аргументы типа X
+    "N806",  # переменные типа X_train
 ]
 
 pycodestyle = { max-doc-length = 105 }
