@@ -1,18 +1,24 @@
-import csv
 import json
 import logging
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
+from sqlalchemy import MetaData, Table, text
+from sqlalchemy.dialects.postgresql import insert
+
+from nhl_match_prediction.etl_pipeline.connection import get_engine
 
 BASE_DIR = Path(__file__).resolve().parents[2]
-
 RAW_DIR = BASE_DIR / "data" / "raw"
-OUT_DIR = BASE_DIR / "data" / "processed"
-
-OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 logger = logging.getLogger(__name__)
+
+
+def get_games_state(engine):
+    with engine.connect() as conn:
+        res = conn.execute(text("SELECT game_id, game_state FROM games"))
+        return {r[0]: r[1] for r in res}
 
 
 def read_json(path: Path):
@@ -21,10 +27,14 @@ def read_json(path: Path):
 
 
 def toi_to_minutes(toi_str):
-    if not toi_str:
+    if not toi_str or ":" not in toi_str:
         return 0
-    minutes, seconds = map(int, toi_str.split(":"))
-    return minutes + seconds / 60
+    try:
+        minutes, seconds = map(int, toi_str.split(":"))
+        return minutes + seconds / 60
+    except Exception:
+        logger.warning(f"Invalid TOI format: {toi_str}")
+        return 0
 
 
 def build_team_timezone():
@@ -45,96 +55,122 @@ def build_team_timezone():
 def parse_offset(offset_str):
     if not offset_str:
         return 0
+
     sign = -1 if offset_str.startswith("-") else 1
-    hours = int(offset_str[1:3])
+
+    try:
+        hours = int(offset_str[1:3])
+    except Exception:
+        logger.warning(f"Invalid timezone offset: {offset_str}")
+        return 0
+
     return sign * hours
+
+
+def _calculate_travel_metrics(data, away_id, team_timezone):
+    home_tz_str = data.get("venueUTCOffset")
+    away_tz_str = team_timezone.get(away_id, home_tz_str)
+
+    home_tz = parse_offset(home_tz_str)
+    away_tz = parse_offset(away_tz_str) if away_tz_str else home_tz
+
+    timezone_shift = home_tz - away_tz
+    return {
+        "timezone_change": abs(timezone_shift),
+        "eastward_travel": 1 if timezone_shift > 0 else 0,
+        "westward_travel": 1 if timezone_shift < 0 else 0,
+    }
+
+
+def _calculate_penalty_metrics(summary, home_abbr, away_abbr):
+    # Сразу добавим diff в словарь, чтобы упростить основной цикл
+    m = {"home_penalties": 0, "away_penalties": 0, "home_pim": 0, "away_pim": 0}
+
+    for period in summary.get("penalties", []):
+        for pen in period.get("penalties", []):
+            team = pen.get("teamAbbrev", {}).get("default")
+            duration = pen.get("duration", 0)
+
+            if team == home_abbr:
+                m["home_penalties"] += 1
+                m["home_pim"] += duration
+            elif team == away_abbr:
+                m["away_penalties"] += 1
+                m["away_pim"] += duration
+
+    m["penalty_diff"] = m["home_penalties"] - m["away_penalties"]
+    m["pim_diff"] = m["home_pim"] - m["away_pim"]
+    return m
 
 
 def extract_games():
     # -----------------------
     # 1. games.csv
     # -----------------------
-
     games_rows = []
 
     team_timezone = build_team_timezone()
 
     for path in (RAW_DIR / "games").glob("*.json"):
-        data = read_json(path)
-
-        game_id = data["id"]
-        date = data["gameDate"]
-
-        start_time = data["startTimeUTC"]
-
-        season = data["season"]
-
-        home = data["homeTeam"]
-        away = data["awayTeam"]
-
-        home_tz_str = data.get("venueUTCOffset")
-        away_tz_str = team_timezone.get(away["id"], home_tz_str)
-
-        home_tz = parse_offset(home_tz_str)
-        away_tz = parse_offset(away_tz_str)
-
-        timezone_change = abs(home_tz - away_tz)
-
-        timezone_shift = home_tz - away_tz
-
-        eastward_travel = 1 if timezone_shift > 0 else 0
-        westward_travel = 1 if timezone_shift < 0 else 0
-
-        home_score = home.get("score")
-        away_score = away.get("score")
-
-        # пропускаем несыгранные матчи
-        if home_score is None or away_score is None:
+        try:
+            data = read_json(path)
+        except Exception as e:
+            logger.error(f"Failed to read {path}: {e}")
             continue
 
-        home_sog = home.get("sog")
-        away_sog = away.get("sog")
+        home, away = data["homeTeam"], data["awayTeam"]
+        # if mode != "full":
+        #     old_state = existing_games.get(game_id)
 
+        #     # если уже финальный и не изменился
+        #     if old_state == "OFF" and game_state == "OFF":
+        #         continue
+
+        # 1. Travel
+        travel = _calculate_travel_metrics(data, away["id"], team_timezone)
+
+        # 2. Scores & SOG
+        home_score, away_score = home.get("score"), away.get("score")
+        home_sog, away_sog = home.get("sog"), away.get("sog")
+
+        # 3. Penalties
+        pens = _calculate_penalty_metrics(data.get("summary", {}), home["abbrev"], away["abbrev"])
+
+        period_type = data.get("periodDescriptor", {}).get("periodType")
+
+        # --- scores ---
+        if home_score is None or away_score is None:
+            goal_diff = None
+            total_goals = None
+            home_win = None
+            one_goal_game = None
+        else:
+            goal_diff = home_score - away_score
+            total_goals = home_score + away_score
+            home_win = 1 if home_score > away_score else 0
+            one_goal_game = 1 if abs(goal_diff) == 1 else 0
+
+        # --- shots ---
+
+        sog_diff = home_sog - away_sog if home_sog is not None and away_sog is not None else None
+
+        # --- venue ---
         venue = data.get("venue", {}).get("default")
         venue_location = data.get("venueLocation", {}).get("default")
 
-        summary = data.get("summary", {})
-        period_type = data.get("periodDescriptor", {}).get("periodType")
-
-        home_penalties = 0
-        away_penalties = 0
-        home_pim = 0
-        away_pim = 0
-
-        for period in summary.get("penalties", []):
-            for pen in period.get("penalties", []):
-                team = pen.get("teamAbbrev", {}).get("default")
-                duration = pen.get("duration", 0)
-
-                if team == home["abbrev"]:
-                    home_penalties += 1
-                    home_pim += duration
-                elif team == away["abbrev"]:
-                    away_penalties += 1
-                    away_pim += duration
-
-        goal_diff = home_score - away_score
-        sog_diff = home_sog - away_sog if home_sog is not None and away_sog is not None else None
-
-        total_goals = home_score + away_score
-
         games_rows.append(
             {
-                "game_id": game_id,
-                "date": date,
-                "season": season,
+                "game_id": data["id"],
+                "game_state": data.get("gameState"),
+                "date": data["gameDate"],
+                "season": data["season"],
                 "game_type": data.get("gameType"),
                 "venue": venue,
                 "venue_location": venue_location,
-                "start_time": start_time,
-                "timezone_change": timezone_change,
-                "eastward_travel": eastward_travel,
-                "westward_travel": westward_travel,
+                "start_time": data["startTimeUTC"],
+                "timezone_change": travel.get("timezone_change"),
+                "eastward_travel": travel.get("eastward_travel"),
+                "westward_travel": travel.get("westward_travel"),
                 "neutral_site": 1 if data.get("neutralSite") else 0,
                 "home_team_id": home["id"],
                 "home_team_abbr": home["abbrev"],
@@ -147,18 +183,20 @@ def extract_games():
                 "away_sog": away_sog,
                 "goal_diff": goal_diff,
                 "sog_diff": sog_diff,
-                "home_win": 1 if home_score > away_score else 0,
-                "one_goal_game": 1 if abs(goal_diff) == 1 else 0,
-                "home_penalties": home_penalties,
-                "away_penalties": away_penalties,
-                "home_pim_summary": home_pim,
-                "away_pim_summary": away_pim,
-                "penalty_diff": home_penalties - away_penalties,
-                "pim_diff": home_pim - away_pim,
+                "home_win": home_win,
+                "one_goal_game": one_goal_game,
+                "home_penalties": pens["home_penalties"],
+                "away_penalties": pens["away_penalties"],
+                "home_pim_summary": pens["home_pim"],
+                "away_pim_summary": pens["away_pim"],
+                "penalty_diff": pens["penalty_diff"],
+                "pim_diff": pens["pim_diff"],
                 "is_overtime": 1 if period_type == "OT" else 0,
                 "is_shootout": 1 if period_type == "SO" else 0,
             }
         )
+
+    logger.info(f"games extracted: {len(games_rows)} rows")
     return games_rows
 
 
@@ -172,6 +210,14 @@ def extract_team_stats():
     for path in (RAW_DIR / "boxscore").glob("*.json"):
         data = read_json(path)
         game_id = data.get("id")
+        game_state = data.get("gameState")
+
+        # if mode != "full":
+        #     old_state = existing_games.get(game_id)
+
+        # если уже финальный и не изменился
+        # if old_state == "OFF" and game_state == "OFF":
+        #     continue
 
         if "playerByGameStats" not in data:
             logger.info(f"boxscore {game_id}: no playerByGameStats, skipping")
@@ -195,6 +241,7 @@ def extract_team_stats():
             team_rows.append(
                 {
                     "game_id": game_id,
+                    "game_state": game_state,
                     "team_id": team_meta["id"],
                     "team_abbr": team_meta["abbrev"],
                     "is_home": side == "homeTeam",
@@ -214,6 +261,7 @@ def extract_team_stats():
                     "total_toi": sum(toi_to_minutes(p.get("toi")) for p in skaters),
                 }
             )
+    logger.info(f"team_game_stats extracted: {len(team_rows)} rows")
     return team_rows
 
 
@@ -223,16 +271,28 @@ def extract_goalies():
     # -----------------------
 
     def parse_sa(s):
-        if not s:
+        if not s or "/" not in s:
             return 0, 0
-        saves, shots = map(int, s.split("/"))
-        return saves, shots
+        try:
+            saves, shots = map(int, s.split("/"))
+            return saves, shots
+        except Exception:
+            logger.warning(f"Invalid shotsAgainst format: {s}")
+            return 0, 0
 
     goalie_rows = []
 
     for path in (RAW_DIR / "boxscore").glob("*.json"):
         data = read_json(path)
         game_id = data["id"]
+        game_state = data.get("gameState")
+
+        # if mode != "full":
+        #     old_state = existing_games.get(game_id)
+
+        # если уже финальный и не изменился
+        # if old_state == "OFF" and game_state == "OFF":
+        #     continue
 
         if "playerByGameStats" not in data:
             logger.info(f"boxscore {game_id}: no playerByGameStats, skipping")
@@ -252,9 +312,12 @@ def extract_goalies():
                 _pp_saves, pp_shots = parse_sa(goalie.get("powerPlayShotsAgainst"))
                 _sh_saves, sh_shots = parse_sa(goalie.get("shorthandedShotsAgainst"))
 
+                toi_minutes = toi_to_minutes(goalie.get("toi"))
+
                 goalie_rows.append(
                     {
                         "game_id": game_id,
+                        "game_state": game_state,
                         "team_id": team_id,
                         "goalie_id": goalie["playerId"],
                         "goalie_name": goalie.get("name", {}).get("default"),
@@ -272,9 +335,11 @@ def extract_goalies():
                         "pp_shots_against": pp_shots,
                         "sh_shots_against": sh_shots,
                         "toi_minutes": toi_to_minutes(goalie.get("toi")),
-                        "played_full_game": 1 if goalie.get("toi") == "60:00" else 0,
+                        "played_full_game": 1 if toi_minutes >= 60 else 0,  # noqa: PLR2004
                     }
                 )
+
+    logger.info(f"goalie_game_stats extracted: {len(goalie_rows)} rows")
     return goalie_rows
 
 
@@ -289,6 +354,9 @@ def extract_standings():
         data = read_json(path)
 
         for team in data.get("standings", []):
+            hw = team.get("homeWins") or 0
+            hg = team.get("homeGamesPlayed") or 1
+            home_win_pctg = hw / hg
             standings_rows.append(
                 {
                     # date & season
@@ -356,7 +424,7 @@ def extract_standings():
                     "shootout_wins": team.get("shootoutWins"),
                     "shootout_losses": team.get("shootoutLosses"),
                     # Home / Road win pct
-                    "home_win_pctg": team.get("homeWins") / max(team.get("homeGamesPlayed", 1), 1),
+                    "home_win_pctg": home_win_pctg,
                     "road_win_pctg": team.get("roadWins") / max(team.get("roadGamesPlayed", 1), 1),
                     # Goal rates
                     "goals_for_per_game": team.get("goalFor") / max(team.get("gamesPlayed", 1), 1),
@@ -373,6 +441,7 @@ def extract_standings():
                     "is_wildcard_race": data.get("wildCardIndicator"),
                 }
             )
+    logger.info(f"standings_daily extracted: {len(standings_rows)} rows")
     return standings_rows
 
 
@@ -429,6 +498,7 @@ def extract_rosters():
                     "birth_country": player.get("birthCountry"),
                 }
             )
+    logger.info(f"roster_snapshot extracted: {len(roster_rows)} rows")
     return roster_rows
 
 
@@ -440,6 +510,12 @@ def extract_schedule():
 
         for day in data.get("gameWeek", []):
             for game in day.get("games", []):
+                # if mode != "full":
+                #     old_state = existing_games.get(game_id)
+
+                # если уже финальный и не изменился
+                # if old_state == "OFF" and game_state == "OFF":
+                #     continue
                 rows.append(
                     {
                         "game_id": game["id"],
@@ -458,196 +534,213 @@ def extract_schedule():
                         "period_type": game.get("periodDescriptor", {}).get("periodType"),
                     }
                 )
-
+    logger.info(f"schedule_games extracted: {len(rows)} rows")
     return rows
 
 
 def extract_player_stats():
     rows = []
 
-    for path in (RAW_DIR / "boxscore").glob("*.json"):
-        boxscore_json = read_json(path)
+    def build_skater_row(p, team_id, season, game_id, game_state):
+        return {
+            "player_id": p["playerId"],
+            "name": p["name"]["default"],
+            "position": p["position"],
+            "team_id": team_id,
+            "season": season,
+            "game_id": game_id,
+            "game_state": game_state,
+            # skater stats
+            "total_points": p.get("points", np.nan),
+            "total_goals": p.get("goals", np.nan),
+            "total_assists": p.get("assists", np.nan),
+            "toi_minutes": toi_to_minutes(p.get("toi")),
+            "pim": p.get("pim", np.nan),
+            "hits": p.get("hits", np.nan),
+            "powerPlayGoals": p.get("powerPlayGoals", np.nan),
+            "sog": p.get("sog", np.nan),
+            "faceoffWinningPctg": p.get("faceoffWinningPctg", np.nan),
+            "blockedShots": p.get("blockedShots", np.nan),
+            "shifts": p.get("shifts", np.nan),
+            "giveaways": p.get("giveaways", np.nan),
+            "takeaways": p.get("takeaways", np.nan),
+            # goalie fields (empty)
+            "starter": False,
+            "evenStrengthShotsAgainst": np.nan,
+            "powerPlayShotsAgainst": np.nan,
+            "shorthandedShotsAgainst": np.nan,
+            "saveShotsAgainst": np.nan,
+            "evenStrengthGoalsAgainst": np.nan,
+            "powerPlayGoalsAgainst": np.nan,
+            "shorthandedGoalsAgainst": np.nan,
+            "goalsAgainst": np.nan,
+            "shotsAgainst": np.nan,
+            "saves": np.nan,
+            # future features
+            "last_n_games_points": np.nan,
+            "rank_in_team": np.nan,
+        }
 
-        if "playerByGameStats" not in boxscore_json:
+    def build_goalie_row(p, team_id, season, game_id, game_state):
+        return {
+            "player_id": p["playerId"],
+            "name": p["name"]["default"],
+            "position": "G",
+            "team_id": team_id,
+            "season": season,
+            "game_id": game_id,
+            "game_state": game_state,
+            # skater fields (empty)
+            "total_points": np.nan,
+            "total_goals": np.nan,
+            "total_assists": np.nan,
+            "toi_minutes": toi_to_minutes(p.get("toi")),
+            "pim": p.get("pim", np.nan),
+            "hits": np.nan,
+            "powerPlayGoals": np.nan,
+            "sog": np.nan,
+            "faceoffWinningPctg": np.nan,
+            "blockedShots": np.nan,
+            "shifts": np.nan,
+            "giveaways": np.nan,
+            "takeaways": np.nan,
+            # goalie stats
+            "starter": p.get("starter", False),
+            "evenStrengthShotsAgainst": p.get("evenStrengthShotsAgainst", np.nan),
+            "powerPlayShotsAgainst": p.get("powerPlayShotsAgainst", np.nan),
+            "shorthandedShotsAgainst": p.get("shorthandedShotsAgainst", np.nan),
+            "saveShotsAgainst": p.get("saveShotsAgainst", np.nan),
+            "evenStrengthGoalsAgainst": p.get("evenStrengthGoalsAgainst", np.nan),
+            "powerPlayGoalsAgainst": p.get("powerPlayGoalsAgainst", np.nan),
+            "shorthandedGoalsAgainst": p.get("shorthandedGoalsAgainst", np.nan),
+            "goalsAgainst": p.get("goalsAgainst", np.nan),
+            "shotsAgainst": p.get("shotsAgainst", np.nan),
+            "saves": p.get("saves", np.nan),
+            # future features
+            "last_n_games_points": np.nan,
+            "rank_in_team": np.nan,
+        }
+
+    for path in (RAW_DIR / "boxscore").glob("*.json"):
+        data = read_json(path)
+        game_id = data.get("id")
+        game_state = data.get("gameState")
+
+        # if mode != "full":
+        #     old_state = existing_games.get(game_id)
+        # если хочешь — можно вернуть фильтр
+        # if old_state == "OFF" and game_state == "OFF":
+        #     continue
+
+        if "playerByGameStats" not in data:
             logger.info(f"{path.stem}: no playerByGameStats, skipping")
             continue
 
-        for team_side in ["homeTeam", "awayTeam"]:
-            if team_side not in boxscore_json["playerByGameStats"]:
-                logger.info(f"{path.stem}: no {team_side} stats, skipping")
+        for side in ["homeTeam", "awayTeam"]:
+            if side not in data["playerByGameStats"]:
+                logger.info(f"{path.stem}: no {side} stats, skipping")
                 continue
 
-            team = boxscore_json[team_side]
+            team = data[side]
             team_id = team["id"]
-            season = boxscore_json.get("season")
-            game_id = boxscore_json.get("id")
-            game_state = boxscore_json.get("gameState")
+            season = data.get("season")
 
-            # --- Forwards ---
-            for p in boxscore_json["playerByGameStats"][team_side]["forwards"]:
-                rows.append(
-                    {
-                        "player_id": p["playerId"],
-                        "name": p["name"]["default"],
-                        "position": p["position"],
-                        "team_id": team_id,
-                        "season": season,
-                        "game_id": game_id,
-                        "gameState": game_state,
-                        "total_points": p.get("points", np.nan),
-                        "total_goals": p.get("goals", np.nan),
-                        "total_assists": p.get("assists", np.nan),
-                        "toi_minutes": toi_to_minutes(p.get("toi")),
-                        "pim": p.get("pim", np.nan),
-                        "hits": p.get("hits", np.nan),
-                        "powerPlayGoals": p.get("powerPlayGoals", np.nan),
-                        "sog": p.get("sog", np.nan),
-                        "faceoffWinningPctg": p.get("faceoffWinningPctg", np.nan),
-                        "blockedShots": p.get("blockedShots", np.nan),
-                        "shifts": p.get("shifts", np.nan),
-                        "giveaways": p.get("giveaways", np.nan),
-                        "takeaways": p.get("takeaways", np.nan),
-                        # Goalie fields
-                        "starter": False,
-                        "evenStrengthShotsAgainst": np.nan,
-                        "powerPlayShotsAgainst": np.nan,
-                        "shorthandedShotsAgainst": np.nan,
-                        "saveShotsAgainst": np.nan,
-                        "evenStrengthGoalsAgainst": np.nan,
-                        "powerPlayGoalsAgainst": np.nan,
-                        "shorthandedGoalsAgainst": np.nan,
-                        "goalsAgainst": np.nan,
-                        "shotsAgainst": np.nan,
-                        "saves": np.nan,
-                        "last_n_games_points": np.nan,  # заполнить позже на основе истории
-                        "rank_in_team": np.nan,  # заполнить позже на основе истории
-                    }
-                )
+            stats = data["playerByGameStats"][side]
 
-            # --- Defense ---
-            for p in boxscore_json["playerByGameStats"][team_side]["defense"]:
-                rows.append(
-                    {
-                        "player_id": p["playerId"],
-                        "name": p["name"]["default"],
-                        "position": p["position"],
-                        "team_id": team_id,
-                        "season": season,
-                        "game_id": game_id,
-                        "gameState": game_state,
-                        "total_points": p.get("points", np.nan),
-                        "total_goals": p.get("goals", np.nan),
-                        "total_assists": p.get("assists", np.nan),
-                        "toi_minutes": toi_to_minutes(p.get("toi")),
-                        "pim": p.get("pim", np.nan),
-                        "hits": p.get("hits", np.nan),
-                        "powerPlayGoals": p.get("powerPlayGoals", np.nan),
-                        "sog": p.get("sog", np.nan),
-                        "faceoffWinningPctg": p.get("faceoffWinningPctg", np.nan),
-                        "blockedShots": p.get("blockedShots", np.nan),
-                        "shifts": p.get("shifts", np.nan),
-                        "giveaways": p.get("giveaways", np.nan),
-                        "takeaways": p.get("takeaways", np.nan),
-                        # Goalie fields
-                        "starter": False,
-                        "evenStrengthShotsAgainst": np.nan,
-                        "powerPlayShotsAgainst": np.nan,
-                        "shorthandedShotsAgainst": np.nan,
-                        "saveShotsAgainst": np.nan,
-                        "evenStrengthGoalsAgainst": np.nan,
-                        "powerPlayGoalsAgainst": np.nan,
-                        "shorthandedGoalsAgainst": np.nan,
-                        "goalsAgainst": np.nan,
-                        "shotsAgainst": np.nan,
-                        "saves": np.nan,
-                        "last_n_games_points": np.nan,  # заполнить позже на основе истории
-                        "rank_in_team": np.nan,  # заполнить позже на основе истории
-                    }
-                )
+            # --- skaters (forwards + defense) ---
+            skaters = stats.get("forwards", []) + stats.get("defense", [])
 
-            # --- Goalies ---
-            for p in boxscore_json["playerByGameStats"][team_side]["goalies"]:
-                rows.append(
-                    {
-                        "player_id": p["playerId"],
-                        "name": p["name"]["default"],
-                        "position": "G",
-                        "team_id": team_id,
-                        "season": season,
-                        "game_id": game_id,
-                        "gameState": game_state,
-                        # Player fields
-                        "total_points": np.nan,
-                        "total_goals": np.nan,
-                        "total_assists": np.nan,
-                        "toi_minutes": toi_to_minutes(p.get("toi")),
-                        "pim": p.get("pim", np.nan),
-                        "hits": np.nan,
-                        "powerPlayGoals": np.nan,
-                        "sog": np.nan,
-                        "faceoffWinningPctg": np.nan,
-                        "blockedShots": np.nan,
-                        "shifts": np.nan,
-                        "giveaways": np.nan,
-                        "takeaways": np.nan,
-                        # Goalie fields
-                        "starter": p.get("starter", False),
-                        "evenStrengthShotsAgainst": p.get("evenStrengthShotsAgainst", np.nan),
-                        "powerPlayShotsAgainst": p.get("powerPlayShotsAgainst", np.nan),
-                        "shorthandedShotsAgainst": p.get("shorthandedShotsAgainst", np.nan),
-                        "saveShotsAgainst": p.get("saveShotsAgainst", np.nan),
-                        "evenStrengthGoalsAgainst": p.get("evenStrengthGoalsAgainst", np.nan),
-                        "powerPlayGoalsAgainst": p.get("powerPlayGoalsAgainst", np.nan),
-                        "shorthandedGoalsAgainst": p.get("shorthandedGoalsAgainst", np.nan),
-                        "goalsAgainst": p.get("goalsAgainst", np.nan),
-                        "shotsAgainst": p.get("shotsAgainst", np.nan),
-                        "saves": p.get("saves", np.nan),
-                        "last_n_games_points": np.nan,  # заполнить позже на основе истории
-                        "rank_in_team": np.nan,  # заполнить позже на основе истории
-                    }
-                )
+            for p in skaters:
+                rows.append(build_skater_row(p, team_id, season, game_id, game_state))
 
+            # --- goalies ---
+            for p in stats.get("goalies", []):
+                rows.append(build_goalie_row(p, team_id, season, game_id, game_state))
+    logger.info("player_stats extracted")
     return rows
 
 
-def write_csv(rows, csv_name):
-    # -----------------------
-    # запись в CSV
-    # -----------------------
+def upsert_table(engine, table_name, df, conflict_cols):
+    if df.empty:
+        return
 
-    if rows:
-        with Path.open(OUT_DIR / csv_name, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=rows[0].keys())
-            writer.writeheader()
-            writer.writerows(rows)
+    logger.info(f"Upserting {len(df)} rows into {table_name}")
 
-        logger.info(f"{csv_name} written")
+    metadata = MetaData()
+    table = Table(table_name, metadata, autoload_with=engine)
+
+    records = df.to_dict(orient="records")
+
+    stmt = insert(table).values(records)
+
+    update_cols = {
+        c.name: stmt.excluded[c.name] for c in table.columns if c.name not in conflict_cols
+    }
+
+    # 🔥 ВАЖНО: не обновляем финальные матчи
+    if "game_state" in df.columns:
+        stmt = stmt.on_conflict_do_update(
+            index_elements=conflict_cols,
+            set_=update_cols,
+            where=((table.c.game_state != "OFF") | (stmt.excluded.game_state != "OFF")),
+        )
     else:
-        logger.info("No finished games found")
+        stmt = stmt.on_conflict_do_update(
+            index_elements=conflict_cols,
+            set_=update_cols,
+        )
+
+    with engine.begin() as conn:
+        conn.execute(stmt)
 
 
-def main():
+def write_tables(engine, table, rows, mode):
+    if not rows:
+        return
+
+    df = pd.DataFrame(rows)
+
+    if mode == "full":
+        df.to_sql(table, engine, if_exists="replace", index=False)
+        return
+
+    # incremental = UPSERT
+    conflict_map = {
+        "games": ["game_id"],
+        "team_game_stats": ["game_id", "team_id"],
+        "goalie_game_stats": ["game_id", "goalie_id"],
+        "player_stats": ["game_id", "player_id", "team_id"],
+        "schedule_games": ["game_id"],
+        "standings_daily": ["team_abbrev", "date"],  # важно!
+        "roster_snapshot": ["season", "team_abbrev", "player_id"],
+    }
+
+    upsert_table(engine, table, df, conflict_map[table])
+
+
+def build_all_tables(mode="incremental", engine=None):
+    if engine is None:
+        engine = get_engine()
+
+    # existing_games = get_games_state(engine) if mode != "full" else {}
     games_rows = extract_games()
-    write_csv(games_rows, "games.csv")
-
     team_rows = extract_team_stats()
-    write_csv(team_rows, "team_game_stats.csv")
-
     goalie_rows = extract_goalies()
-    write_csv(goalie_rows, "goalie_game_stats.csv")
-
     standings_rows = extract_standings()
-    write_csv(standings_rows, "standings_daily.csv")
-
     roster_rows = extract_rosters()
-    write_csv(roster_rows, "roster_snapshot.csv")
-
     schedule_rows = extract_schedule()
-    write_csv(schedule_rows, "schedule_games.csv")
-
     player_stats = extract_player_stats()
-    write_csv(player_stats, "player_stats.csv")
+
+    write_tables(engine, "games", games_rows, mode)
+    write_tables(engine, "team_game_stats", team_rows, mode)
+    write_tables(engine, "goalie_game_stats", goalie_rows, mode)
+    write_tables(engine, "standings_daily", standings_rows, mode)
+    write_tables(engine, "roster_snapshot", roster_rows, mode)
+    write_tables(engine, "schedule_games", schedule_rows, mode)
+    write_tables(engine, "player_stats", player_stats, mode)
+
+    logger.info("✅ ETL finished")
 
 
 if __name__ == "__main__":
-    main()
+    build_all_tables()
