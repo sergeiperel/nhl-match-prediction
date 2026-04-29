@@ -233,3 +233,6 @@ nhl_match_prediction/modeling/artifacts/
 
 # visualization folder
 visualizations/
+
+catboost_info/
+models/
