@@ -5,7 +5,7 @@ def add_schedule_strength(standings: pd.DataFrame) -> pd.DataFrame:
     standings = standings.sort_values(["team_abbrev", "date"]).reset_index(drop=True)
 
     windows = [3, 5, 10]
-    grouped = standings.groupby("team_abbrev")
+    grouped = standings.groupby("team_abbrev", sort=False)
 
     for n in windows:
         standings[f"point_pct_last{n}"] = grouped["point_pctg"].transform(
