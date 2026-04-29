@@ -1,23 +1,29 @@
-from pathlib import Path
-
 import pandas as pd
+
+from nhl_match_prediction.etl_pipeline.connection import get_engine
 
 from .goalie_features import add_goalie_features
 
-BASE_DIR = Path(__file__).resolve().parents[2]
 
-INPUT_PATH = BASE_DIR / "data" / "processed" / "goalie_game_stats.csv"
-OUT_PATH = BASE_DIR / "data" / "processed" / "goalie_game_stats.csv"  # goalie_game_stats_features
+def build_goalie_features(engine=None, mode="full"):
+    if engine is None:
+        engine = get_engine()
 
+    # --- load ---
+    df = pd.read_sql("SELECT * FROM goalie_game_stats", engine)
 
-def build_goalie_features():
-    df = pd.read_csv(INPUT_PATH)
-
+    # --- features ---
     df = add_goalie_features(df)
 
-    df.to_csv(OUT_PATH, index=False)
+    # --- save (full rebuild) ---
+    df.to_sql(
+        "goalie_game_stats_features",
+        engine,
+        if_exists="replace",
+        index=False,
+    )
 
-    print(f"Saved to {OUT_PATH}")
+    print(f"✅ goalie_game_stats_features rebuilt: {len(df)} rows")
 
 
 if __name__ == "__main__":
