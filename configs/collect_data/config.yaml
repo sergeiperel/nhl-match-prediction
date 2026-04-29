@@ -2,29 +2,35 @@ defaults:
   - _self_
 
 date:
-  start: 2026-03-28
-  end: 2026-04-30
+  start: 2026-04-14
+  end: 2026-05-05
 
 pipeline:
   fail_fast: true
   log_level: INFO
+  mode: full  # или incremental
+
 
 steps:
-  collect_raw: false
-  collect_standings: false
-  build_features: false
-  json_to_csv: false
+  collect_raw: true
+  collect_standings: true
 
-  build_games_with_features: false
-  standings_features: false
-  build_goalie_features: false
-  build_player_features: false
 
-  load_sqlite: false
-  build_match_features: true
-  build_future_games_features: true
-  build_upcoming_match_features: true
-  export_match_features: true
+  build_pbp_features: true
+  json_to_postgres: true
+
+  build_xg_game_dataset: true
+
+  build_games_with_features: true
+  build_standings_daily_features: true
+  build_goalie_features: true
+  build_player_features: true
+
+  # load_sqlite: true
+  build_match_features: false
+  build_future_games_features: false
+  build_upcoming_match_features: false
+  export_match_features: false
 
 
 
