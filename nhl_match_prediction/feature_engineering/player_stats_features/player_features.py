@@ -21,7 +21,7 @@ def process_teams(g, row):
     row["faceoff_avg"] = g["faceoffWinningPctg"].mean(skipna=True)
 
     row["pp_goals_team_sum"] = g["powerPlayGoals"].sum(skipna=True)
-    row["team_last5_points_sum"] = g["last_n_games_points"].sum(skipna=True)
+    # row["team_last5_points_sum"] = g["last_n_games_points"].sum(skipna=True)
 
     return team_points_total
 
@@ -43,7 +43,7 @@ def process_skaters(g, row, team_points_total):
         row["top3_sog_sum"] = top3["sog"].sum()
         row["top3_faceoff_avg"] = top3["faceoffWinningPctg"].mean()
 
-        row["top3_last5_points_sum"] = top3["last_n_games_points"].sum()
+        # row["top3_last5_points_sum"] = top3["last_n_games_points"].sum()
         row["top3_pp_goals_sum"] = top3["powerPlayGoals"].sum()
 
         row["top3_points_ratio"] = (
@@ -116,13 +116,13 @@ def process_goalie(g, row):
 def add_player_features(df: pd.DataFrame) -> pd.DataFrame:
     features = []
 
-    grouped = df.groupby(["game_id", "team_id", "season"])
+    grouped = df.groupby(["game_id", "team_id"], sort=False)
 
-    for (game_id, team_id, season), g in grouped:
+    for (game_id, team_id), g in grouped:
         row = {
             "game_id": game_id,
             "team_id": team_id,
-            "season": season,
+            "season": g["season"].iloc[0],  # сохраняем сезон
         }
 
         team_points_total = process_teams(g, row)
