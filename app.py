@@ -27,6 +27,19 @@ THRESHOLD = 0.5
 model = joblib.load(MODEL_PATH)
 
 
+# INIT
+app = FastAPI()
+app.include_router(tasks_router)
+
+client = Redis(host="redis")
+
+MODEL_PATH = Path(__file__).parent / "logs/logistic/model2.joblib"
+CONTENT_DIR = Path(__file__).parent / "content"
+THRESHOLD = 0.5
+
+model = joblib.load(MODEL_PATH)
+
+
 # SHAP INIT
 sample_df = get_upcoming_matches()
 
