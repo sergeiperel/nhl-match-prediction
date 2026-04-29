@@ -55,61 +55,104 @@ services:
       #start_interval: 3s
 
     depends_on:
+      # db-init:
+      #   condition: service_completed_successfully
       redis:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
 
-  worker:
-    build: .
-    working_dir: /app
-    command: celery -A nhl_match_prediction.tasks.celery_app:celery_app worker --loglevel=info -E
-    volumes:
-      - .:/app
-    networks:
-      - net-back
-    depends_on:
-      - redis
-      - backend
-    env_file:
-      - .env
+  # worker:
+  #   build: .
+  #   working_dir: /app
+  #   command: celery -A nhl_match_prediction.tasks.celery_app:celery_app worker --loglevel=info -E
+  #   volumes:
+  #     - .:/app
+  #   networks:
+  #     - net-back
+  #   depends_on:
+  #     - redis
+  #     - backend
+  #   env_file:
+  #     - .env
+  #   environment:
+  #     - PYTHONPATH=/app
+
+  # beat:
+  #   build: .
+  #   command: celery -A nhl_match_prediction.tasks.celery_app:celery_app beat --loglevel=info
+  #   volumes:
+  #     - .:/app
+  #   networks:
+  #     - net-back
+  #   env_file:
+  #     - .env
+  #   environment:
+  #     - PYTHONPATH=/app
+
+  # bot:
+  #   build: .
+  #   command: python bot.py
+  #   env_file:
+  #     - .env
+  #   volumes:
+  #     - .:/app
+  #   networks:
+  #     - net-back
+  #   depends_on:
+  #     - backend
+  #     - redis
+  #   environment:
+  #     - PYTHONPATH=/app
+
+  # flower:
+  #   image: mher/flower
+  #   command: >
+  #     sh -c "sleep 5 && celery --broker=redis://redis:6379/0 flower --port=5555"
+  #   ports:
+  #     - "5555:5555"
+  #   depends_on:
+  #     - redis
+  #     - worker
+  #   networks:
+  #     - net-back
+
+  postgres:
+    image: postgres:15
+    container_name: nhl_postgres
+    restart: always
+
     environment:
-      - PYTHONPATH=/app
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: nhl_db
 
-  beat:
-    build: .
-    command: celery -A nhl_match_prediction.tasks.celery_app:celery_app beat --loglevel=info
-    volumes:
-      - .:/app
-    networks:
-      - net-back
-    env_file:
-      - .env
-    environment:
-      - PYTHONPATH=/app
-
-  bot:
-    build: .
-    command: python bot.py
-    env_file:
-      - .env
-    volumes:
-      - .:/app
-    networks:
-      - net-back
-    depends_on:
-      - backend
-      - redis
-    environment:
-      - PYTHONPATH=/app
-
-  flower:
-    image: mher/flower
-    command: >
-      sh -c "sleep 5 && celery --broker=redis://redis:6379/0 flower --port=5555"
     ports:
-      - "5555:5555"
+      - "5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    networks:
+      - net-back
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+
+  db-init:
+    build: .
+    volumes:
+      - .:/app
+    command: python -m nhl_match_prediction.etl_pipeline.init_db
     depends_on:
-      - redis
-      - worker
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
     networks:
       - net-back
 
@@ -118,6 +161,7 @@ services:
 
 volumes:
   redis-volume:
+  postgres_data:
 
 
 networks:
