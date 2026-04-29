@@ -3,9 +3,9 @@ import pandas as pd
 
 
 def add_elo_features(games):
-    K = 20  # шаг обновления рейтинга  # noqa: N806
-    HOME_ADV = 80  # бонус домашней команды  # noqa: N806
-    TREND_ALPHA = 0.6  # тренд Elo  # noqa: N806
+    K = 20  # шаг обновления рейтинга
+    HOME_ADV = 80  # бонус домашней команды
+    TREND_ALPHA = 0.6  # тренд Elo
 
     games = games.sort_values("date").reset_index(drop=True)
 
@@ -35,21 +35,24 @@ def add_elo_features(games):
         expected_home = 1 / (1 + 10 ** ((a_elo - (h_elo + HOME_ADV)) / 400))
 
         result_home = row["home_win"]
-        result_away = 1 - result_home
 
-        goal_diff = row.get("goal_diff", 1)
-        if pd.isna(goal_diff) or goal_diff < 0:
-            goal_diff = 1
-        multiplier = np.log(goal_diff + 1)
+        if not pd.isna(result_home):
+            result_away = 1 - result_home
 
-        elo[h] += K * multiplier * (result_home - expected_home)
-        elo[a] += K * multiplier * (result_away - (1 - expected_home))
+            goal_diff = row.get("goal_diff", 1)
+            if pd.isna(goal_diff) or goal_diff < 0:
+                goal_diff = 1
 
-        elo_history[h].append(elo[h])
-        elo_history[a].append(elo[a])
+            multiplier = np.log(goal_diff + 1)
 
-        elo_trend[h] = TREND_ALPHA * (elo[h] - h_elo) + (1 - TREND_ALPHA) * elo_trend[h]
-        elo_trend[a] = TREND_ALPHA * (elo[a] - a_elo) + (1 - TREND_ALPHA) * elo_trend[a]
+            elo[h] += K * multiplier * (result_home - expected_home)
+            elo[a] += K * multiplier * (result_away - (1 - expected_home))
+
+            elo_history[h].append(elo[h])
+            elo_history[a].append(elo[a])
+
+            elo_trend[h] = TREND_ALPHA * (elo[h] - h_elo) + (1 - TREND_ALPHA) * elo_trend[h]
+            elo_trend[a] = TREND_ALPHA * (elo[a] - a_elo) + (1 - TREND_ALPHA) * elo_trend[a]
 
     games["home_elo"] = home_elo
     games["away_elo"] = away_elo

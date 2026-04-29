@@ -76,7 +76,7 @@ for _, row in arenas_df.iterrows():
 
 
 def haversine(lat1, lon1, lat2, lon2):
-    R = 6371  # noqa: N806
+    R = 6371
     phi1, phi2 = math.radians(lat1), math.radians(lat2)
     d_phi = math.radians(lat2 - lat1)
     d_lambda = math.radians(lon2 - lon1)

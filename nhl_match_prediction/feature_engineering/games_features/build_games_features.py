@@ -1,17 +1,12 @@
-from pathlib import Path
-
 import numpy as np
 import pandas as pd
+
+from nhl_match_prediction.etl_pipeline.connection import get_engine
 
 from .elo_matches import add_elo_features
 from .fatigue_features import add_fatigue_features
 from .geo_location_data import timezone_change, travel_distance
 from .performance_features import add_performance_features
-
-BASE_DIR = Path(__file__).resolve().parents[2]
-
-GAMES_PATH = BASE_DIR / "data" / "processed" / "games.csv"
-OUT_PATH = BASE_DIR / "data" / "processed" / "games.csv"  # games_with_features
 
 
 def add_travel_features(games):
@@ -40,22 +35,28 @@ def add_travel_features(games):
             return np.nan
 
     games["travel_distance_away_team"] = games.apply(safe_distance, axis=1)
-    games["timezone_change"] = games.apply(safe_timezone, axis=1)
+    games["geo_timezone_change"] = games.apply(safe_timezone, axis=1)
 
     return games
 
 
-def build_games_with_features():
-    games = pd.read_csv(GAMES_PATH)
+def build_games_with_features(engine=None, mode="full"):
+    if engine is None:
+        engine = get_engine()
+    # --- load ---
+    games = pd.read_sql("SELECT * FROM games", engine)
+    games = games.sort_values("date").reset_index(drop=True)
 
+    # --- features ---
     games = add_performance_features(games)
     games = add_travel_features(games)
     games = add_fatigue_features(games)
     games = add_elo_features(games)
 
-    games.to_csv(OUT_PATH, index=False)
+    # --- save (always full rebuild) ---
+    games.to_sql("games_with_features", engine, if_exists="replace", index=False)
 
-    print(f"Saved to {OUT_PATH}")
+    print("✅ games_with_features updated")
 
 
 if __name__ == "__main__":
