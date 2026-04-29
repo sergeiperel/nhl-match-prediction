@@ -8,7 +8,6 @@ def setup_logger(name: str, log_file: Path):
     logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
 
-    # чтобы не дублировались хендлеры
     if logger.handlers:
         return logger
 
@@ -18,7 +17,7 @@ def setup_logger(name: str, log_file: Path):
     fh = logging.FileHandler(log_file, encoding="utf-8")
     fh.setFormatter(formatter)
 
-    # console handler (чтобы ты видел в терминале)
+    # console handler
     ch = logging.StreamHandler()
     ch.setFormatter(formatter)
 

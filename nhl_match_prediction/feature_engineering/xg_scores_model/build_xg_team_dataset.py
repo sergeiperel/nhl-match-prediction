@@ -3,15 +3,15 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from sqlalchemy import MetaData, Table, text
+from sqlalchemy.dialects.postgresql import insert
 from tqdm import tqdm
 
+from nhl_match_prediction.etl_pipeline.connection import get_engine
 from nhl_match_prediction.feature_engineering.xg_scores_model.config import (
     LOG_PATH,
     PBP_PATH,
-    SPLIT_DATE,
     VALID_EVENTS,
-    XG_DATASET_PATH,
-    XG_SHOTS_DATASET_PATH,
 )
 from nhl_match_prediction.feature_engineering.xg_scores_model.logger import setup_logger
 from nhl_match_prediction.feature_engineering.xg_scores_model.xg_utils import get_time_in_game
@@ -31,7 +31,6 @@ def process_game_pbp(game_data):
     if not plays:
         return None
 
-    # Собираем сторону защиты
     period_sides = {}
     for play in plays:
         p = play.get("periodDescriptor", {}).get("number")
@@ -178,29 +177,10 @@ def build_dataset():
     return df_full
 
 
-def split_games(df):
-    df["game_date"] = pd.to_datetime(df["game_date"])
-
-    game_dates = df.groupby("game_id")["game_date"].min()
-
-    split_date = pd.to_datetime(SPLIT_DATE)
-
-    train_games = game_dates[game_dates < split_date].index
-    test_games = game_dates[game_dates >= split_date].index
-
-    logger.info(f"Train games: {len(train_games)}")
-    logger.info(f"Test games: {len(test_games)}")
-
-    logger.info(f"Train period: ({game_dates[train_games].min()}, {game_dates[train_games].max()})")
-    logger.info(f"Test period: ({game_dates[test_games].min()}, {game_dates[test_games].max()})")
-
-    return train_games, test_games
-
-
-def add_features(df, train_games):
+def add_features(df):
     df = df.sort_values(["game_id", "period", "game_time"]).reset_index(drop=True)
 
-    codes = df["situation"].astype(str).str.zfill(4)
+    codes = df["situation"].fillna(0).astype(str).str.zfill(4)
 
     df["team_skaters"] = pd.to_numeric(codes.str[1], errors="coerce").fillna(5)
     df["opp_skaters"] = pd.to_numeric(codes.str[2], errors="coerce").fillna(5)
@@ -218,10 +198,10 @@ def add_features(df, train_games):
     df["prev_shot_event"] = df.groupby("game_id")["event_type"].shift(1)
     df["prev_time"] = df.groupby("game_id")["game_time"].shift(1)
 
-    df["delta_t"] = df["game_time"] - df["prev_time"]
+    df["delta_t_rebound"] = df["game_time"] - df["prev_time"]
 
     df["is_rebound"] = (
-        (df["delta_t"].fillna(999) <= 2)  # noqa: PLR2004
+        (df["delta_t_rebound"].fillna(999) <= 2)  # noqa: PLR2004
         & (df["prev_shot_event"].isin(["shot", "shot-on-goal", "goal"]))
     ).astype(int)
 
@@ -234,15 +214,6 @@ def add_features(df, train_games):
         df["event_type"].isin(["shot", "shot-on-goal", "goal", "missed-shot"])
     ).astype(int)
 
-    top_k = 10
-    train_df = df[df["game_id"].isin(train_games)]
-
-    common = train_df["situation_compact"].value_counts().index[:top_k]
-
-    df["situation_compact"] = df["situation_compact"].where(
-        df["situation_compact"].isin(common), "other"
-    )
-
     for col in ["team_skaters", "opp_skaters", "man_diff", "total_skaters"]:
         df[col] = df[col].astype(float)
 
@@ -252,27 +223,61 @@ def add_features(df, train_games):
     return df
 
 
+def upsert_dataframe(df, table_name, engine):
+    metadata = MetaData()
+    table = Table(table_name, metadata, autoload_with=engine)
+
+    df = df.copy()
+    df = df.where(pd.notnull(df), None)
+
+    records = df.to_dict(orient="records")
+
+    stmt = insert(table).values(records)
+
+    pk_cols = ["game_id", "period", "game_time", "team_id"]
+
+    update_dict = {c.name: stmt.excluded[c.name] for c in table.columns if c.name not in pk_cols}
+
+    stmt = stmt.on_conflict_do_update(index_elements=pk_cols, set_=update_dict)
+
+    with engine.begin() as conn:
+        conn.execute(stmt)
+
+
 def main():
-    XG_DATASET_PATH.parent.mkdir(parents=True, exist_ok=True)
-    XG_SHOTS_DATASET_PATH.parent.mkdir(parents=True, exist_ok=True)
+    engine = get_engine()
 
     df = build_dataset()
-
-    train_games, _ = split_games(df)
-
-    df = add_features(df, train_games)
-
-    df.to_csv(XG_DATASET_PATH, index=False)
-
-    logger.info(f"Using valid events: {VALID_EVENTS}")
+    df = add_features(df)
+    df = df.drop_duplicates(subset=["game_id", "period", "game_time", "team_id"])
 
     df_shots = df[df["event_type"].isin(VALID_EVENTS)].copy()
-    df_shots.to_csv(XG_SHOTS_DATASET_PATH, index=False)
+    df_shots = df_shots.drop_duplicates(subset=["game_id", "period", "game_time", "team_id"])
 
-    logger.info(f"Saved full dataset to {XG_DATASET_PATH}")
-    logger.info(f"Saved shots dataset to {XG_SHOTS_DATASET_PATH}")
+    # upsert_dataframe(df, "pbp_events_features", engine)
+    # upsert_dataframe(df_shots, "pbp_shots_features", engine)
 
-    print("Saved datasets")
+    with engine.begin() as conn:
+        conn.execute(text("TRUNCATE TABLE pbp_events_features"))
+        conn.execute(text("TRUNCATE TABLE pbp_shots_features"))
+
+    df.to_sql(
+        "pbp_events_features",
+        engine,
+        if_exists="append",
+        index=False,
+        chunksize=5000,
+        method="multi",
+    )
+
+    df_shots.to_sql(
+        "pbp_shots_features",
+        engine,
+        if_exists="append",
+        index=False,
+        chunksize=5000,
+        method="multi",
+    )
 
 
 if __name__ == "__main__":

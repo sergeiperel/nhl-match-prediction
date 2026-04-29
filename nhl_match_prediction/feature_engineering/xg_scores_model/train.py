@@ -51,7 +51,7 @@ def prepare_features(df):
         "delta_d",
         "speed",
         "delta_angle",
-        # situation features (ОЧЕНЬ ВАЖНЫ)
+        # situation features
         # "team_skaters",
         # "opp_skaters",
         "man_diff",

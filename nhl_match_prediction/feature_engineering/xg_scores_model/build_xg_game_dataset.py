@@ -1,31 +1,17 @@
 import numpy as np
 import pandas as pd
 from catboost import CatBoostClassifier
+from sqlalchemy import MetaData, Table
+from sqlalchemy.dialects.postgresql import insert
 
+from nhl_match_prediction.etl_pipeline.connection import get_engine
 from nhl_match_prediction.feature_engineering.xg_scores_model.config import (
     LOG_PATH,
     MODEL_FILE,
-    PROCESSED_PATH,
-    XG_SHOTS_DATASET_PATH,
 )
 from nhl_match_prediction.feature_engineering.xg_scores_model.logger import setup_logger
 
 logger = setup_logger("xg_game_dataset", LOG_PATH / "build_game_dataset.log")
-
-
-OUTPUT_PATH = PROCESSED_PATH / "xg_game_dataset.csv"
-
-
-# ======================
-# LOAD
-# ======================
-def load_data():
-    df = pd.read_csv(XG_SHOTS_DATASET_PATH)
-    df["game_date"] = pd.to_datetime(df["game_date"])
-    df = df.sort_values(["game_id", "period", "game_time"]).reset_index(drop=True)
-
-    logger.info(f"Loaded shots dataset: {df.shape}")
-    return df
 
 
 # ======================
@@ -37,6 +23,37 @@ def load_model():
 
     logger.info(f"Loaded xG model from {MODEL_FILE}")
     return model
+
+
+# ======================
+# LOAD NEW SHOTS
+# ======================
+
+
+def load_new_shots(engine):
+    existing = pd.read_sql("SELECT DISTINCT game_id FROM game_xg_features", engine)[
+        "game_id"
+    ].tolist()
+
+    query = """
+        SELECT *
+        FROM pbp_shots_features
+    """
+
+    if existing:
+        query += f" WHERE game_id NOT IN ({','.join(map(str, existing))})"
+
+    df = pd.read_sql(query, engine)
+
+    if df.empty:
+        return df
+
+    df["game_date"] = pd.to_datetime(df["game_date"])
+
+    df = df.sort_values(["game_date", "game_id", "period", "game_time"]).reset_index(drop=True)
+
+    logger.info(f"Loaded new shots: {df.shape}")
+    return df
 
 
 # ======================
@@ -59,13 +76,20 @@ def prepare_features(df, model):
 
 
 # ======================
-# PREDICT XG
+# FEATURES + XG
 # ======================
 def add_xg(df, model):
-    X = prepare_features(df, model)  # noqa: N806
-    df["xg"] = model.predict_proba(X)[:, 1]
+    feature_names = model.feature_names_
 
-    logger.info("Computed xG for all shots")
+    for col in ["shot_type", "situation_compact", "prev_event_type"]:
+        df[col] = df[col].fillna("unknown").astype(str)
+
+    for col in feature_names:
+        if col in df.columns:
+            df[col] = df[col].fillna(0)
+
+    X = df[feature_names]
+    df["xg"] = model.predict_proba(X)[:, 1]
 
     return df
 
@@ -92,7 +116,7 @@ def aggregate_games(df):
         .rename(columns={"team_id": "away_team_id"})
     )
 
-    game = game_home.merge(game_away, on=["game_id", "game_date"], how="outer")
+    game = game_home.merge(game_away, on=["game_id", "game_date"], how="inner")
 
     game = game.dropna(subset=["home_team_id", "away_team_id"])
 
@@ -114,72 +138,114 @@ def aggregate_games(df):
 
 
 # ======================
+# LOAD HISTORY FOR ROLLING
+# ======================
+def load_history(engine):
+    df = pd.read_sql("SELECT * FROM game_xg_features", engine)
+
+    if df.empty:
+        return df
+
+    df["game_date"] = pd.to_datetime(df["game_date"])
+
+    return df.sort_values(["game_date", "game_id"]).reset_index(drop=True)
+
+
+# ======================
 # ADD ROLLING FEATURES
 # ======================
-def add_rolling_features(game):
-    game = game.sort_values("game_date").reset_index(drop=True)
+def add_rolling(history, new):
+    df = pd.concat([history, new], ignore_index=True)
+
+    df = df.sort_values(["game_date", "game_id"]).reset_index(drop=True)
 
     # EWM
-    game["home_xg_ewm"] = game.groupby("home_team_id")["home_xg"].transform(
+    df["home_xg_ewm"] = df.groupby("home_team_id")["home_xg"].transform(
         lambda x: x.shift(1).ewm(alpha=0.2).mean()
     )
 
-    game["away_xg_ewm"] = game.groupby("away_team_id")["away_xg"].transform(
+    df["away_xg_ewm"] = df.groupby("away_team_id")["away_xg"].transform(
         lambda x: x.shift(1).ewm(alpha=0.2).mean()
     )
 
     # rolling 5
-    game["home_xg_last5"] = game.groupby("home_team_id")["home_xg"].transform(
+    df["home_xg_last5"] = df.groupby("home_team_id")["home_xg"].transform(
         lambda x: x.shift(1).rolling(5, min_periods=3).mean()
     )
 
-    game["away_xg_last5"] = game.groupby("away_team_id")["away_xg"].transform(
+    df["away_xg_last5"] = df.groupby("away_team_id")["away_xg"].transform(
         lambda x: x.shift(1).rolling(5, min_periods=3).mean()
     )
 
-    game["home_shots_last5"] = game.groupby("home_team_id")["home_shots"].transform(
+    df["home_shots_last5"] = df.groupby("home_team_id")["home_shots"].transform(
         lambda x: x.shift(1).rolling(5, min_periods=3).mean()
     )
 
-    game["away_shots_last5"] = game.groupby("away_team_id")["away_shots"].transform(
+    df["away_shots_last5"] = df.groupby("away_team_id")["away_shots"].transform(
         lambda x: x.shift(1).rolling(5, min_periods=3).mean()
     )
 
     # diffs
-    game["xg_diff_last5"] = game["home_xg_last5"] - game["away_xg_last5"]
-    game["shots_diff_last5"] = game["home_shots_last5"] - game["away_shots_last5"]
+    df["xg_diff_last5"] = df["home_xg_last5"] - df["away_xg_last5"]
+    df["shots_diff_last5"] = df["home_shots_last5"] - df["away_shots_last5"]
 
     logger.info("Added rolling features")
 
-    return game
+    return df
 
 
 # ======================
-# SAVE
+# UPSERT
 # ======================
-def save_dataset(game):
-    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+def upsert(df, engine):
+    df = df.where(pd.notnull(df), None)
 
-    game.to_csv(OUTPUT_PATH, index=False)
+    metadata = MetaData()
+    table = Table("game_xg_features", metadata, autoload_with=engine)
 
-    logger.info(f"Saved final dataset to {OUTPUT_PATH}")
+    pk = ["game_id"]
+
+    stmt = insert(table).values(df.to_dict(orient="records"))
+
+    update_dict = {c.name: stmt.excluded[c.name] for c in table.columns if c.name not in pk}
+
+    stmt = stmt.on_conflict_do_update(index_elements=pk, set_=update_dict)
+
+    with engine.begin() as conn:
+        conn.execute(stmt)
 
 
 # ======================
 # MAIN
 # ======================
+
+
 def main():
-    df = load_data()
+    engine = get_engine()
     model = load_model()
+
+    df = load_new_shots(engine)
+
+    if df.empty:
+        logger.info("No new data")
+        return
 
     df = add_xg(df, model)
 
-    game = aggregate_games(df)
-    game = add_rolling_features(game)
+    new_games = aggregate_games(df)
 
-    save_dataset(game)
+    history = load_history(engine)
 
-    logger.info("Pipeline completed successfully")
+    # убираем дубли уже существующих игр
+    new_games = new_games[~new_games["game_id"].isin(history["game_id"])]
+
+    full = add_rolling(history, new_games)
+
+    result = full[full["game_id"].isin(new_games["game_id"])]
+
+    upsert(result, engine)
+
+    logger.info(f"✅ Inserted {result.shape}")
 
 
 if __name__ == "__main__":
