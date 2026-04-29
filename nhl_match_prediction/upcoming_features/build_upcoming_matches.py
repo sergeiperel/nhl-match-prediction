@@ -1,46 +1,27 @@
-import sqlite3
-from pathlib import Path
-
 import pandas as pd
 
-BASE_DIR = Path(__file__).resolve().parents[2]
-DB_PATH = BASE_DIR / "data" / "sql" / "nhl.db"
+from nhl_match_prediction.etl_pipeline.connection import get_engine
 
 
 def get_upcoming_matches() -> pd.DataFrame:
-    con = sqlite3.connect(str(DB_PATH))
-    con.row_factory = sqlite3.Row
-    con.execute("PRAGMA journal_mode=WAL;")
-    con.execute("PRAGMA synchronous=NORMAL;")
-    con.execute("PRAGMA temp_store=MEMORY;")
-    con.execute("PRAGMA cache_size=1000000;")
+    engine = get_engine()
 
-    # ------------------------------------------------------------------------------------------
-    # UPCOMING GAMES
-    # ------------------------------------------------------------------------------------------
-
-    df = pd.read_sql_query(
-        """
+    query = """
         SELECT
             u.*,
             h.logo_url AS home_logo,
             a.logo_url AS away_logo,
-			ar.Arena AS arena
-
+            ar.arena AS arena
         FROM upcoming_match_features u
         LEFT JOIN team_logo h
             ON u.home_team_abbr = h.team_abbr
         LEFT JOIN team_logo a
             ON u.away_team_abbr = a.team_abbr
-		LEFT JOIN arenas_data ar
-			ON u.home_team_abbr = ar.team_abbr
-        """,
-        con,
-    )
+        LEFT JOIN arenas_data ar
+            ON u.home_team_abbr = ar.team_abbr
+    """
 
-    con.close()
-
-    return df
+    return pd.read_sql(query, engine)
 
 
 if __name__ == "__main__":

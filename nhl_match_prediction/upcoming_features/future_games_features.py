@@ -1,51 +1,51 @@
-import sqlite3
-from pathlib import Path
-
 import pandas as pd
+from sqlalchemy import text
 
-from nhl_match_prediction.games_features.elo_matches import add_elo_features
-from nhl_match_prediction.games_features.geo_location_data import timezone_change, travel_distance
-
-BASE_DIR = Path(__file__).resolve().parents[2]
-DB_PATH = BASE_DIR / "data" / "sql" / "nhl.db"
+from nhl_match_prediction.etl_pipeline.connection import get_engine
+from nhl_match_prediction.feature_engineering.games_features.elo_matches import add_elo_features
+from nhl_match_prediction.feature_engineering.games_features.geo_location_data import (
+    timezone_change,
+    travel_distance,
+)
 
 
 def build_future_games_features():
-    con = sqlite3.connect(DB_PATH)
+    engine = get_engine()
 
-    games = pd.read_sql(
-        """
-        SELECT
-            game_id,
-            date,
-            game_type,
-            neutral_site,
-            home_team_id,
-            away_team_id,
-            home_team_abbr,
-            away_team_abbr,
-            home_win,
-            ABS(home_score - away_score) AS goal_diff
-        FROM games
-    """,
-        con,
-    )
+    with engine.begin() as con:
+        games = pd.read_sql(
+            """
+            SELECT
+                game_id,
+                date,
+                game_type,
+                neutral_site,
+                home_team_id,
+                away_team_id,
+                home_team_abbr,
+                away_team_abbr,
+                home_win,
+                ABS(home_score - away_score) AS goal_diff
+            FROM games
+        """,
+            con,
+        )
 
-    schedule = pd.read_sql(
-        """
-        SELECT
-            game_id,
-            game_date,
-            home_team_id,
-            away_team_id,
-            home_team_abbr,
-            away_team_abbr,
-            game_state
-        FROM schedule_games
-        WHERE game_state = 'FUT'
-    """,
-        con,
-    )
+        schedule = pd.read_sql(
+            """
+            SELECT
+                game_id,
+                game_date,
+                home_team_id,
+                away_team_id,
+                home_team_abbr,
+                away_team_abbr,
+                game_state
+            FROM schedule_games
+            WHERE game_state = 'FUT'
+        """,
+            con,
+        )
 
     # elo + trends on history
     games = games.sort_values("date").reset_index(drop=True)
@@ -132,15 +132,21 @@ def build_future_games_features():
         ]
     ]
 
-    future.to_sql("future_games_features", con, if_exists="replace", index=False)
+    with engine.begin() as con:
+        future.to_sql(
+            "future_games_features",
+            con,
+            if_exists="replace",
+            index=False,
+            method="multi",
+        )
 
-    con.execute("""
-        CREATE INDEX IF NOT EXISTS idx_future_game_id
-        ON future_games_features(game_id)
-    """)
-
-    con.commit()
-    con.close()
+        con.execute(
+            text("""
+            CREATE INDEX IF NOT EXISTS idx_future_game_id
+            ON future_games_features(game_id)
+        """)
+        )
 
     print("✅ future_games_features built successfully!")
 
