@@ -3,27 +3,37 @@ from datetime import date, datetime
 from pathlib import Path
 
 import hydra
-from nhl_match_prediction.games_features.build_games_features import build_games_with_features
-from nhl_match_prediction.goalie_features.build_goalie_features import build_goalie_features
-from nhl_match_prediction.pbp_features.build_features import build_play_by_play_dataset
-from nhl_match_prediction.player_stats_features.build_player_stats_features import (
-    build_player_features,
-)
-from nhl_match_prediction.standings_features.build_standings_features import (
-    build_standings_daily_features,
-)
-from nhl_match_prediction.xg_scores_model.xg_utils import build_xg_dataset, update_xg_features
 from omegaconf import DictConfig
 from pipeline_runner import PipelineRunner
 
 from nhl_match_prediction.collector.collect_nhl_raw import collect_season
 from nhl_match_prediction.collector.collect_standings import collect_standings
 from nhl_match_prediction.etl_pipeline.build_match_features import build_match_features
+from nhl_match_prediction.etl_pipeline.build_oltp_tables import build_all_tables
+from nhl_match_prediction.etl_pipeline.connection import get_engine
 from nhl_match_prediction.etl_pipeline.export_match_features import (
     main as export_match_features_main,
 )
-from nhl_match_prediction.etl_pipeline.json_to_csv import main as json_to_csv_main
-from nhl_match_prediction.etl_pipeline.load_to_db import main as load_sqlite_main
+from nhl_match_prediction.feature_engineering.games_features.build_games_features import (
+    build_games_with_features,
+)
+from nhl_match_prediction.feature_engineering.goalie_features.build_goalie_features import (
+    build_goalie_features,
+)
+from nhl_match_prediction.feature_engineering.pbp_features.build_pbp_features import (
+    build_play_by_play_dataset,
+)
+from nhl_match_prediction.feature_engineering.player_stats_features.build_player_stats_features import (  # noqa: E501
+    build_player_features,
+)
+from nhl_match_prediction.feature_engineering.standings_features.build_standings_features import (
+    build_standings_daily_features,
+)
+from nhl_match_prediction.feature_engineering.xg_scores_model.build_xg_game_dataset import (
+    main as build_xg_game_dataset,
+)
+
+# from nhl_match_prediction.etl_pipeline.load_to_db import main as load_sqlite_main
 from nhl_match_prediction.upcoming_features.future_games_features import build_future_games_features
 from nhl_match_prediction.upcoming_features.upcoming_match_features import upcoming_match_features
 
@@ -38,12 +48,12 @@ def setup_logging(level: str = "INFO"):
     root.handlers.clear()
     root.setLevel(getattr(logging, level))
 
-    # ---- FILE (детальный лог)
+    # ---- FILE
     file_formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s")
     file_handler = logging.FileHandler(log_file)
     file_handler.setFormatter(file_formatter)
 
-    # ---- CONSOLE (чистый вывод)
+    # ---- CONSOLE
     console_formatter = logging.Formatter("%(message)s")
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(console_formatter)
@@ -63,6 +73,8 @@ def str_to_date(s: str) -> date:
 
 @hydra.main(config_path="configs/collect_data", config_name="config", version_base=None)
 def main(cfg: DictConfig):
+    engine = get_engine()
+
     setup_logging(cfg.pipeline.log_level)
 
     logger = logging.getLogger(__name__)
@@ -71,7 +83,7 @@ def main(cfg: DictConfig):
     logger.info(f"Pipeline mode: {mode}")
 
     is_full = mode == "full"
-    is_incremental = mode == "incremental"
+    # is_incremental = mode == "incremental"
 
     start_date = str_to_date(cfg.date.start)
     end_date = str_to_date(cfg.date.end)
@@ -103,58 +115,64 @@ def main(cfg: DictConfig):
     # ========================================================= #
 
     runner.run_step(
-        name="Build XG Dataset",
-        func=build_xg_dataset,
-        enabled=is_full,
-    )
-
-    runner.run_step(
-        name="Update XG Features",
-        func=update_xg_features,
-        enabled=is_incremental,
-    )
-
-    runner.run_step(
-        name="Build Features",
+        name="Build PBP Features",
         func=build_play_by_play_dataset,
         enabled=cfg.steps.build_pbp_features and is_full,
+        engine=engine,
+        mode=mode,
     )
 
     runner.run_step(
-        name="JSON → CSV",
-        func=json_to_csv_main,
-        enabled=cfg.steps.json_to_csv,
+        name="JSON -> Postgres",
+        func=build_all_tables,
+        enabled=cfg.steps.json_to_postgres,
+        engine=engine,
+        mode=mode,
+    )
+
+    runner.run_step(
+        name="Build XG Game Dataset",
+        func=build_xg_game_dataset,
+        enabled=cfg.steps.build_xg_game_dataset,
     )
 
     runner.run_step(
         name="build_games_with_features",
         func=build_games_with_features,
-        enabled=cfg.steps.build_games_with_features and is_full,
+        enabled=cfg.steps.build_games_with_features,
+        engine=engine,
+        mode=mode,
     )
 
     runner.run_step(
         name="build_standings_daily_features",
         func=build_standings_daily_features,
-        enabled=cfg.steps.standings_features,
+        enabled=cfg.steps.build_standings_daily_features,
+        engine=engine,
+        mode=mode,
     )
 
     runner.run_step(
         name="build_goalie_features",
         func=build_goalie_features,
         enabled=cfg.steps.build_goalie_features,
+        engine=engine,
+        mode=mode,
     )
 
     runner.run_step(
         name="build_player_features",
         func=build_player_features,
         enabled=cfg.steps.build_player_features,
+        engine=engine,
+        mode=mode,
     )
 
-    runner.run_step(
-        name="Load to SQLite",
-        func=load_sqlite_main,
-        enabled=cfg.steps.load_sqlite,
-    )
+    # runner.run_step(
+    #     name="Load to SQLite",
+    #     func=load_sqlite_main,
+    #     enabled=cfg.steps.load_sqlite,
+    # )
 
     runner.run_step(
         name="Build Match Features",
